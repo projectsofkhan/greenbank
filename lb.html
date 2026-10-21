@@ -41,17 +41,23 @@
       <div class="lb-list" id="lbList">
         <p class="lb-empty">Loading…</p>
       </div>
+      <div class="lb-mine hidden" id="lbMine">
+        <div class="lb-mine-label">Your rank</div>
+        <div class="lb-row lb-row-mine">
+          <span class="lb-rank" id="myRank">—</span>
+          <span class="lb-name" id="myName">—</span>
+          <span class="lb-pts" id="myPts">—</span>
+          <span class="lb-subs" id="mySubs">—</span>
+        </div>
+      </div>
     </div>
   </main>
 
   <footer class="footer">
     <p>
-      Green Bank classifies items with an on-device model.
-      <span class="info-icon" tabindex="0" aria-describedby="infoTip">i</span>
+      Points are verified by our team
+      <button class="info-icon" id="footerInfo" aria-label="How review works">i</button>
     </p>
-    <div class="info-tip" id="infoTip" role="tooltip">
-      Results are automated and may be incorrect. Our team will check each submission manually to confirm your points.
-    </div>
   </footer>
 
   <nav class="bottom-nav">
@@ -69,6 +75,22 @@
       <span>Leaderboard</span>
     </a>
   </nav>
+
+  <!-- Review modal -->
+  <div class="modal-backdrop hidden" id="reviewModal">
+    <div class="modal modal-info">
+      <button class="modal-close" onclick="closeReview()" aria-label="Close">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <line x1="18" y1="6" x2="6" y2="18"/>
+          <line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+      <h2>How review works</h2>
+      <p class="modal-info-text">
+        Submissions are classified automatically, then checked by our team. If a result is correct, points are kept — if not, they're adjusted.
+      </p>
+    </div>
+  </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="script.js"></script>
