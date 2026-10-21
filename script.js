@@ -20,25 +20,38 @@ const $ = (id) => document.getElementById(id);
 const IS_HOME = !!document.getElementById("pageHome");
 const IS_LB   = !!document.getElementById("pageLeaderboard");
 
-// ====== LABEL → POINTS ======
-// Robust: matches against the label string, case-insensitive.
-// Order matters: "good" wins over "waste" if both appear.
-const POINT_RULES = [
-  { match: /\bgood\b|\breusable\b|\bclean\b|\borganic\b|\bcompost\b/i, points: -500 },
-  { match: /\bwaste\b|\btrash\b|\brubbish\b|\bgarbage\b|\brecycl/i,     points: +100 },
-  { match: /\bplastic\b|\bglass\b|\bmetal\b|\bpaper\b|\bcardboard\b/i, points: +100 },
-];
+// ====== LABEL → POINTS (bulletproof) ======
+function normalizeLabel(s) {
+  return String(s || "")
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[\s\u00A0\u2000-\u200B]+/g, " ")
+    .toLowerCase()
+    .trim();
+}
 
 function pointsForLabel(label) {
-  const clean = String(label || "").trim();
-  if (!clean) return 0;
-  for (const rule of POINT_RULES) {
-    if (rule.match.test(clean)) {
-      console.log(`[points] "${clean}" matched ${rule.match} → ${rule.points}`);
-      return rule.points;
-    }
+  const clean = normalizeLabel(label);
+  console.log(`[points] raw="${label}" normalized="${clean}"`);
+
+  if (!clean) { console.warn("[points] empty label → 0"); return 0; }
+
+  // Explicit priority
+  if (clean.startsWith("good")) { console.log("[points] → -500 (good*)"); return -500; }
+  if (clean.startsWith("waste")) { console.log("[points] → +100 (waste*)"); return +100; }
+
+  // Substring fallback
+  if (/good|reusable|clean|organic|compost/.test(clean)) {
+    console.log("[points] → -500 (good substring)"); return -500;
   }
-  console.warn(`[points] "${clean}" did NOT match any rule → 0`);
+  if (/waste|trash|rubbish|garbage|recycl/.test(clean)) {
+    console.log("[points] → +100 (waste substring)"); return +100;
+  }
+  if (/plastic|glass|metal|paper|cardboard/.test(clean)) {
+    console.log("[points] → +100 (material)"); return +100;
+  }
+
+  console.warn(`[points] NO MATCH for "${clean}" → 0`);
   return 0;
 }
 
@@ -62,20 +75,17 @@ function renderIdentity() {
   idEl.textContent = "-" + getDeviceId();
 }
 
-// ====== USER CREATION ======
+// ====== USER ======
 async function setName(name) {
   localStorage.setItem(NAME_KEY, name);
   renderIdentity();
-
   const deviceId = getDeviceId();
   const ins = await sb.from("users").insert({ device_id: deviceId, name });
   if (!ins.error) return true;
-
   if (ins.error.code === "23505") {
     const upd = await sb.from("users").update({ name }).eq("device_id", deviceId);
     return !upd.error;
   }
-  console.warn("[user] insert failed", ins.error);
   return false;
 }
 
@@ -86,22 +96,32 @@ async function fetchMyTotal() {
     .select("points")
     .eq("device_id", getDeviceId());
   if (error) { console.warn("[points] fetch failed", error); return null; }
-  return (data || []).reduce((s, r) => s + (r.points || 0), 0);
+  const total = (data || []).reduce((s, r) => s + (r.points || 0), 0);
+  console.log(`[points] server total = ${total} across ${(data || []).length} rows`);
+  return total;
 }
+
 function renderPoints(v) {
   const el = $("pointsValue"); if (!el) return;
-  const val = Number(v ?? 0);
+  const val = Number(v);
+  if (isNaN(val)) { el.textContent = "0"; return; }
   el.textContent = val > 0 ? `+${val}` : String(val);
 }
+
 async function refreshPoints() {
   const total = await fetchMyTotal();
   if (total !== null) renderPoints(total);
   return total ?? 0;
 }
+
 function applyPointsLocally(delta) {
   const el = $("pointsValue"); if (!el) return;
-  const current = parseInt(el.textContent.replace("+", ""), 10) || 0;
-  renderPoints(current + delta);
+  const raw = el.textContent.trim().replace(/^[+]/, "");
+  const current = parseInt(raw, 10);
+  const safe = isNaN(current) ? 0 : current;
+  const next = safe + delta;
+  console.log(`[points] chip: ${safe} + ${delta} = ${next}`);
+  renderPoints(next);
   bumpChip();
 }
 function bumpChip() {
@@ -113,6 +133,7 @@ function bumpChip() {
 
 // ====== BOOT ======
 document.addEventListener("DOMContentLoaded", async () => {
+  console.log("[boot] starting");
   renderIdentity();
   $("footerInfo")?.addEventListener("click", openReview);
 
@@ -178,8 +199,10 @@ function closeReview() { closeModal("reviewModal"); }
 // ====== MODEL ======
 async function ensureModel() {
   if (model) return model;
+  console.log("[model] loading…");
   model = await tmImage.load(MODEL_URL + "model.json", MODEL_URL + "metadata.json");
   maxPredictions = model.getTotalClasses();
+  console.log("[model] loaded, classes:", maxPredictions);
   return model;
 }
 
@@ -190,7 +213,6 @@ function triggerUpload() {
   if (!fileInput || !cameraInput) return;
   fileInput.value = "";
   cameraInput.value = "";
-
   if (typeof fileInput.showPicker === "function") {
     try { fileInput.showPicker(); return; } catch (_) {}
   }
@@ -201,6 +223,7 @@ function onFileSelected(e) {
   const file = e.target.files?.[0];
   if (!file) return;
   if (inFlight) { console.warn("[upload] busy — ignoring"); return; }
+  console.log("[upload] file:", file.name, file.size, "bytes");
 
   const reader = new FileReader();
   reader.onload = async () => {
@@ -232,12 +255,10 @@ function onFileSelected(e) {
 // ====== ANALYZE ======
 async function classifyPreview() {
   if (inFlight) return inFlight;
-
   inFlight = (async () => {
     const btn = $("analyzeBtn");
     const fill = $("waveFill");
     const scanLine = $("scanLine");
-
     if (btn) {
       btn.classList.add("busy");
       const l = btn.querySelector(".btn-label");
@@ -257,7 +278,7 @@ async function classifyPreview() {
       if (!img.complete) await new Promise((r) => (img.onload = r));
       await handleImage(img, img.src);
     } catch (err) {
-      console.error("[analyze]", err);
+      console.error("[analyze] ERROR:", err);
       alert("Could not analyze this image. Please try again.");
     } finally {
       clearInterval(tick);
@@ -272,7 +293,6 @@ async function classifyPreview() {
       inFlight = null;
     }
   })();
-
   return inFlight;
 }
 
@@ -280,11 +300,14 @@ async function classifyPreview() {
 async function handleImage(inputEl, dataUrl) {
   const model = await ensureModel();
   const predictions = await model.predict(inputEl);
+  console.log("[classify] predictions:", predictions);
+
   const sorted = [...predictions].sort((a, b) => b.probability - a.probability);
   const top = sorted[0];
+  const label = String(top.className || "");
+  console.log(`[classify] top="${label}" confidence=${top.probability}`);
 
-  console.log("[classify] top class:", JSON.stringify(top.className), "| confidence:", top.probability);
-
+  // Render scores
   const scoresEl = $("scores");
   if (scoresEl) {
     scoresEl.innerHTML = "";
@@ -303,9 +326,9 @@ async function handleImage(inputEl, dataUrl) {
   }
 
   const verdictEl = $("verdictText");
-  if (verdictEl) verdictEl.textContent = `Classified as: ${top.className}`;
+  if (verdictEl) verdictEl.textContent = `Classified as: ${label}`;
 
-  const delta = pointsForLabel(top.className);
+  const delta = pointsForLabel(label);
 
   const deltaEl = $("deltaText");
   if (deltaEl) {
@@ -334,25 +357,21 @@ async function handleImage(inputEl, dataUrl) {
 
   const confidence = Math.round(top.probability * 100);
 
-  // Cloudinary (non-blocking)
   let imageUrl = null;
   try {
-    imageUrl = await uploadToCloudinary(dataUrl, top.className, confidence);
+    imageUrl = await uploadToCloudinary(dataUrl, label, confidence);
     console.log("[cloudinary] uploaded:", imageUrl);
   } catch (e) {
     console.warn("[cloudinary] failed:", e);
-    const note = document.querySelector(".review-note");
-    if (note) note.textContent = "⚠ Image upload failed, but your points were recorded.";
   }
 
-  // Save to Supabase
   const saved = await saveSubmission({
-    label: top.className,
+    label,
     confidence,
-    points: delta,
+    points: delta,   // <- client best-effort; DB trigger overrides
     image_url: imageUrl,
   });
-  console.log("[submission] saved:", saved);
+  console.log("[submission] save result:", saved);
 
   if (saved) await refreshPoints();
 }
@@ -382,13 +401,16 @@ async function uploadToCloudinary(dataUrl, label, confidence) {
 
 // ====== SUPABASE INSERT ======
 async function saveSubmission({ label, confidence, points, image_url }) {
-  const { error } = await sb.from("submissions").insert({
+  const payload = {
     identity: getIdentity(),
     name: getName() || "Guest",
     device_id: getDeviceId(),
     label, confidence, points, image_url,
-  });
-  if (error) { console.warn("[submission] insert failed", error); return false; }
+  };
+  console.log("[submission] inserting:", payload);
+  const { data, error } = await sb.from("submissions").insert(payload).select();
+  if (error) { console.warn("[submission] insert failed:", error); return false; }
+  console.log("[submission] saved row:", data);
   return true;
 }
 
