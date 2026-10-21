@@ -15,6 +15,9 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
+/* Global hide utility */
+.hidden { display: none !important; }
+
 html, body {
   height: 100%;
   background: var(--bg);
@@ -198,7 +201,6 @@ body.modal-open { overflow: hidden; }
   background: linear-gradient(90deg, var(--green-100), var(--white));
   border-color: var(--green-300);
 }
-.hidden { display: none !important; }
 
 .footer {
   max-width: 1200px;
@@ -248,7 +250,6 @@ body.modal-open { overflow: hidden; }
   padding: 20px;
   animation: fadeIn 0.25s ease;
 }
-.modal-backdrop.hidden { display: none; }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 .modal {
   background: var(--white);
