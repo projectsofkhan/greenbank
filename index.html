@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Green Bank</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- Top bar -->
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-dot"></span>
+      Green Bank
+    </div>
+    <div class="points">
+      <span class="points-label">Points</span>
+      <span class="points-value" id="pointsValue">0</span>
+    </div>
+  </header>
+
+  <!-- Main stage -->
+  <main class="stage">
+
+    <!-- Left: The Green Can -->
+    <section class="can-wrap">
+      <div class="can" id="can">
+        <div class="can-lid"></div>
+        <div class="can-door" id="canDoor">
+          <span class="can-door-handle"></span>
+        </div>
+        <div class="can-body-label">GREEN<br/>BANK</div>
+      </div>
+      <p class="can-hint">Drop it in — we'll take it from here.</p>
+    </section>
+
+    <!-- Right: Interaction panel -->
+    <section class="panel">
+      <div class="panel-inner">
+
+        <!-- Idle state -->
+        <div class="state" id="stateIdle">
+          <h1>Ready when you are.</h1>
+          <p class="muted">Start the camera and hold your item in front of it.</p>
+          <button class="btn primary" onclick="startApp()">Start Camera</button>
+        </div>
+
+        <!-- Camera state -->
+        <div class="state hidden" id="stateCamera">
+          <div class="cam-frame">
+            <div id="webcam-container"></div>
+            <div class="cam-overlay"></div>
+          </div>
+          <div class="cam-actions">
+            <button class="btn primary" onclick="capture()">Capture</button>
+            <button class="btn ghost" onclick="resetApp()">Cancel</button>
+          </div>
+        </div>
+
+        <!-- Result state -->
+        <div class="state hidden" id="stateResult">
+          <h2 class="result-title" id="resultTitle">—</h2>
+
+          <div class="scores" id="scores">
+            <!-- filled by JS -->
+          </div>
+
+          <p class="verdict" id="verdictText">—</p>
+          <p class="delta" id="deltaText"></p>
+
+          <p class="review-note">
+            ⓘ Our team will review this submission to confirm the result.
+          </p>
+
+          <div class="cam-actions">
+            <button class="btn primary" onclick="resetApp()">Scan Another</button>
+          </div>
+        </div>
+
+      </div>
+    </section>
+  </main>
+
+  <!-- Footer note -->
+  <footer class="footer">
+    <p>
+      Green Bank classifies items with an on-device model.
+      <span class="info-icon" tabindex="0" aria-describedby="infoTip">i</span>
+    </p>
+    <div class="info-tip" id="infoTip" role="tooltip">
+      Results are automated and may be incorrect. Our team will check each submission manually to confirm your points.
+    </div>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
