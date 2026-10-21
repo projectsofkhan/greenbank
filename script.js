@@ -10,11 +10,15 @@ const CLOUD_NAME    = "fc5nj83m";
 const UPLOAD_PRESET = "ml_default";
 const CLOUD_FOLDER  = "greenbank";
 
-let model, maxPredictions;
+const SUPABASE_URL      = "https://hfevedbqkjgwycdtranm.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmZXZlZGJxa2pnd3ljZHRyYW5tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI1Mzk4MDgsImV4cCI6MjEwODExNTgwOH0.RYainvFoFqOe-cF5CcjPPtGa3NJs4PHcqtDaZOrLbHY";
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let model, maxPredictions, isBusy = false;
 const $ = (id) => document.getElementById(id);
 
 // ====== IDENTITY ======
-// device id: persistent random string, generated once per browser
 function getDeviceId() {
   let id = localStorage.getItem(DEVICE_KEY);
   if (!id) {
@@ -24,33 +28,15 @@ function getDeviceId() {
   }
   return id;
 }
-
-function getName() {
-  return localStorage.getItem(NAME_KEY) || "";
-}
-function setName(name) {
-  localStorage.setItem(NAME_KEY, name);
-  renderIdentity();
-}
-
-// Combined identity: "Aarav-dev_ab12cd34"
-function getIdentity() {
-  const name = getName() || "Guest";
-  return `${name}-${getDeviceId()}`;
-}
+function getName() { return localStorage.getItem(NAME_KEY) || ""; }
+function setName(n) { localStorage.setItem(NAME_KEY, n); renderIdentity(); }
+function getIdentity() { return `${getName() || "Guest"}-${getDeviceId()}`; }
 
 function renderIdentity() {
-  const nameEl = $("userName");
-  const idEl = $("userId");
+  const nameEl = $("userName"), idEl = $("userId");
   if (!nameEl || !idEl) return;
-  const name = getName();
-  if (name) {
-    nameEl.textContent = name;
-    idEl.textContent = "-" + getDeviceId();
-  } else {
-    nameEl.textContent = "Guest";
-    idEl.textContent = "-" + getDeviceId();
-  }
+  nameEl.textContent = getName() || "Guest";
+  idEl.textContent = "-" + getDeviceId();
 }
 
 // ====== BOOT ======
@@ -60,6 +46,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const fileInput = $("fileInput");
   if (fileInput) fileInput.addEventListener("change", onFileSelected);
+
+  // Desktop top-nav links
+  document.querySelectorAll(".desktop-nav .nav-link").forEach((a) => {
+    a.addEventListener("click", (e) => {
+      e.preventDefault();
+      switchPage(a.dataset.page);
+    });
+  });
 
   if (!getName()) {
     $("welcomeModal").classList.remove("hidden");
@@ -78,18 +72,25 @@ function saveName() {
   $("welcomeModal").classList.add("hidden");
 }
 
-// ====== POINTS ======
-function getPoints() {
-  return parseInt(localStorage.getItem(POINTS_KEY) || "0", 10);
+// ====== PAGE ROUTING ======
+function switchPage(page) {
+  document.querySelectorAll(".page").forEach((p) => p.classList.add("hidden"));
+  $("page" + page[0].toUpperCase() + page.slice(1)).classList.remove("hidden");
+
+  document.querySelectorAll(".nav-link, .bn-item").forEach((el) => {
+    el.classList.toggle("active", el.dataset.page === page);
+  });
+
+  if (page === "leaderboard") loadLeaderboard();
 }
+
+// ====== POINTS ======
+function getPoints() { return parseInt(localStorage.getItem(POINTS_KEY) || "0", 10); }
 function setPoints(v) {
   localStorage.setItem(POINTS_KEY, String(v));
   renderPoints();
   const el = document.querySelector(".points");
-  if (el) {
-    el.classList.add("bump");
-    setTimeout(() => el.classList.remove("bump"), 300);
-  }
+  if (el) { el.classList.add("bump"); setTimeout(() => el.classList.remove("bump"), 300); }
 }
 function renderPoints() {
   const v = getPoints();
@@ -103,17 +104,15 @@ async function ensureModel() {
   maxPredictions = model.getTotalClasses();
 }
 
-// ====== UPLOAD ======
+// ====== UPLOAD TRIGGER ======
 function triggerUpload() {
   const fileInput = $("fileInput");
   fileInput.value = "";
   fileInput.click();
 }
-
 function onFileSelected(e) {
   const file = e.target.files?.[0];
   if (!file) return;
-
   const reader = new FileReader();
   reader.onload = () => {
     $("previewImg").src = reader.result;
@@ -122,15 +121,44 @@ function onFileSelected(e) {
   reader.readAsDataURL(file);
 }
 
+// ====== ANALYZE with wave animation ======
 async function classifyPreview() {
+  if (isBusy) return;
+  isBusy = true;
+
+  const btn = $("analyzeBtn");
+  const fill = $("waveFill");
+  const scanLine = $("scanLine");
+  btn.classList.add("busy");
+  btn.querySelector(".btn-label").textContent = "Analyzing…";
+  scanLine.classList.remove("hidden");
+
+  // Fake wave progression: 0 → 90% while model runs, then 100% on done
+  let progress = 0;
+  const tick = setInterval(() => {
+    progress = Math.min(progress + Math.random() * 12, 90);
+    fill.style.setProperty("--fill", progress + "%");
+  }, 200);
+
   try {
     await ensureModel();
     const img = $("previewImg");
     if (!img.complete) await new Promise((r) => (img.onload = r));
+
     await handleImage(img, img.src);
   } catch (err) {
     console.error(err);
     alert("Could not analyze this image.");
+  } finally {
+    clearInterval(tick);
+    fill.style.setProperty("--fill", "100%");
+    setTimeout(() => {
+      fill.style.setProperty("--fill", "0%");
+      btn.classList.remove("busy");
+      btn.querySelector(".btn-label").textContent = "Analyze";
+      scanLine.classList.add("hidden");
+      isBusy = false;
+    }, 350);
   }
 }
 
@@ -177,21 +205,28 @@ async function handleImage(inputEl, dataUrl) {
     });
   });
 
-  uploadToCloudinary(dataUrl, top.className, Math.round(top.probability * 100))
-    .catch((e) => console.warn("Cloudinary upload failed:", e));
+  const confidence = Math.round(top.probability * 100);
+  const imageUrl = await uploadToCloudinary(dataUrl, top.className, confidence)
+    .catch((e) => { console.warn("Cloudinary upload failed:", e); return null; });
+
+  saveSubmission({
+    label: top.className,
+    confidence,
+    points: delta,
+    image_url: imageUrl,
+  });
 }
 
 // ====== CLOUDINARY ======
 async function uploadToCloudinary(dataUrl, label, confidence) {
+  const identity = getIdentity();
   const name = getName() || "Guest";
   const deviceId = getDeviceId();
-  const identity = getIdentity(); // "Aarav-dev_ab12cd34"
 
   const form = new FormData();
   form.append("file", dataUrl);
   form.append("upload_preset", UPLOAD_PRESET);
   form.append("folder", CLOUD_FOLDER);
-  // identity is the human-visible tag; name + device_id kept separate too
   form.append("tags", `greenbank,${identity},${label.replace(/\s+/g, "_")},conf_${confidence}`);
   form.append("context",
     `identity=${encodeURIComponent(identity)}|name=${encodeURIComponent(name)}|device_id=${deviceId}|label=${label}|confidence=${confidence}`);
@@ -201,7 +236,61 @@ async function uploadToCloudinary(dataUrl, label, confidence) {
     { method: "POST", body: form }
   );
   if (!res.ok) throw new Error(`Cloudinary ${res.status}: ${await res.text()}`);
-  return res.json();
+  const data = await res.json();
+  return data.secure_url;
+}
+
+// ====== SUPABASE ======
+async function saveSubmission({ label, confidence, points, image_url }) {
+  const { error } = await sb.from("submissions").insert({
+    identity: getIdentity(),
+    name: getName() || "Guest",
+    device_id: getDeviceId(),
+    label,
+    confidence,
+    points,
+    image_url,
+  });
+  if (error) console.warn("Supabase insert failed:", error);
+}
+
+async function loadLeaderboard() {
+  const list = $("lbList");
+  list.innerHTML = `<p class="lb-empty">Loading…</p>`;
+
+  const { data, error } = await sb
+    .from("leaderboard")
+    .select("*")
+    .limit(100);
+
+  if (error) {
+    console.error(error);
+    list.innerHTML = `<p class="lb-empty">Could not load leaderboard.</p>`;
+    return;
+  }
+  if (!data || data.length === 0) {
+    list.innerHTML = `<p class="lb-empty">No submissions yet. Be the first.</p>`;
+    return;
+  }
+
+  list.innerHTML = "";
+  data.forEach((row, i) => {
+    const el = document.createElement("div");
+    el.className = "lb-row";
+    el.style.animationDelay = `${i * 40}ms`;
+    el.innerHTML = `
+      <span class="lb-rank">${i + 1}</span>
+      <span class="lb-name">${escapeHtml(row.name)}</span>
+      <span class="lb-pts">${row.total_points > 0 ? "+" : ""}${row.total_points}</span>
+      <span class="lb-subs">${row.submissions} scans</span>
+    `;
+    list.appendChild(el);
+  });
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
 // ====== STATE ======
@@ -211,7 +300,6 @@ function switchState(id) {
   );
   $(id).classList.remove("hidden");
 }
-
 function resetApp() {
   $("previewImg").src = "";
   switchState("stateIdle");
@@ -222,8 +310,7 @@ function toggleReview() {
   $("reviewPop").classList.toggle("open");
 }
 document.addEventListener("click", (e) => {
-  const pop = $("reviewPop");
-  const btn = $("reviewBtn");
+  const pop = $("reviewPop"), btn = $("reviewBtn");
   if (!pop || !btn) return;
   if (!pop.contains(e.target) && !btn.contains(e.target)) {
     pop.classList.remove("open");
