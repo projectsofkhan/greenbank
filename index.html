@@ -40,30 +40,40 @@
         <!-- Idle -->
         <div class="state" id="stateIdle">
           <h1>Ready when you are.</h1>
-          <p class="muted">Take a photo or upload one — we'll classify it instantly.</p>
-          <div class="cam-actions">
-            <button class="btn primary" onclick="startCamera()">Start Camera</button>
-            <button class="btn ghost" onclick="triggerUpload()">Upload Image</button>
+          <p class="muted">Upload a photo of the item — we'll classify it instantly.</p>
+
+          <div class="upload-row">
+            <button class="btn primary big" onclick="triggerUpload()">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="17 8 12 3 7 8"/>
+                <line x1="12" y1="3" x2="12" y2="15"/>
+              </svg>
+              Upload Image
+            </button>
+
+            <button class="info-btn" id="reviewBtn" onclick="toggleReview()" aria-label="How review works">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="16" x2="12" y2="12"/>
+                <line x1="12" y1="8" x2="12.01" y2="8"/>
+              </svg>
+            </button>
+
+            <div class="review-pop" id="reviewPop">
+              <strong>How review works</strong>
+              <p>Your image is uploaded to our server. Our team checks whether the classification is correct — if yes, points are applied; if not, no points are changed.</p>
+            </div>
           </div>
+
           <input type="file" id="fileInput" accept="image/*" hidden />
         </div>
 
-        <!-- Camera -->
-        <div class="state hidden" id="stateCamera">
-          <div class="cam-frame">
-            <div id="webcam-container"></div>
-            <div class="cam-overlay"></div>
-          </div>
-          <div class="cam-actions">
-            <button class="btn primary" onclick="capture()">Capture</button>
-            <button class="btn ghost" onclick="resetApp()">Cancel</button>
-          </div>
-        </div>
-
-        <!-- Preview (for upload) -->
+        <!-- Preview -->
         <div class="state hidden" id="statePreview">
           <div class="cam-frame">
             <img id="previewImg" alt="Preview" style="width:100%;height:100%;object-fit:cover;" />
+            <div class="scan-line"></div>
           </div>
           <div class="cam-actions">
             <button class="btn primary" onclick="classifyPreview()">Analyze</button>
