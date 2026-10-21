@@ -1,6 +1,5 @@
 // ====== CONFIG ======
 const MODEL_URL = "./";
-const POINTS_KEY = "greenbank.points";
 const DEVICE_KEY = "greenbank.device";
 const NAME_KEY   = "greenbank.name";
 const WASTE_CLASS = "Waste";
@@ -21,7 +20,7 @@ const $ = (id) => document.getElementById(id);
 const IS_HOME = !!document.getElementById("pageHome");
 const IS_LB   = !!document.getElementById("pageLeaderboard");
 
-// ====== IDENTITY ======
+// ====== IDENTITY (local only) ======
 function getDeviceId() {
   let id = localStorage.getItem(DEVICE_KEY);
   if (!id) {
@@ -34,20 +33,6 @@ function getDeviceId() {
 function getName() { return localStorage.getItem(NAME_KEY) || ""; }
 function getIdentity() { return `${getName() || "Guest"}-${getDeviceId()}`; }
 
-async function setName(name) {
-  localStorage.setItem(NAME_KEY, name);
-  renderIdentity();
-  // Persist to Supabase immediately so it shows up in dashboard
-  try {
-    await sb.from("users").upsert({
-      device_id: getDeviceId(),
-      name,
-    }, { onConflict: "device_id" });
-  } catch (e) {
-    console.warn("User save failed:", e);
-  }
-}
-
 function renderIdentity() {
   const nameEl = $("userName"), idEl = $("userId");
   if (!nameEl || !idEl) return;
@@ -55,19 +40,74 @@ function renderIdentity() {
   idEl.textContent = "-" + getDeviceId();
 }
 
-// ====== BOOT ======
-document.addEventListener("DOMContentLoaded", () => {
-  renderPoints();
+// ====== USER CREATION ======
+async function setName(name) {
+  localStorage.setItem(NAME_KEY, name);
   renderIdentity();
+
+  const deviceId = getDeviceId();
+  console.log("[user] saving", { deviceId, name });
+
+  const ins = await sb.from("users").insert({ device_id: deviceId, name });
+  if (!ins.error) { console.log("[user] inserted", ins.data); return true; }
+
+  if (ins.error.code === "23505") {
+    const upd = await sb.from("users").update({ name }).eq("device_id", deviceId);
+    if (upd.error) { console.warn("[user] update failed", upd.error); return false; }
+    console.log("[user] updated", upd.data);
+    return true;
+  }
+
+  console.warn("[user] insert failed", ins.error);
+  return false;
+}
+
+// ====== POINTS (Supabase = source of truth) ======
+async function fetchMyTotal() {
+  const deviceId = getDeviceId();
+  const { data, error } = await sb
+    .from("submissions")
+    .select("points")
+    .eq("device_id", deviceId);
+
+  if (error) { console.warn("[points] fetch failed", error); return null; }
+
+  const total = (data || []).reduce((s, r) => s + (r.points || 0), 0);
+  return total;
+}
+
+function renderPoints(v) {
+  const el = $("pointsValue");
+  if (!el) return;
+  const val = v ?? 0;
+  el.textContent = val > 0 ? `+${val}` : val;
+}
+
+async function refreshPoints() {
+  const total = await fetchMyTotal();
+  if (total !== null) renderPoints(total);
+  return total ?? 0;
+}
+
+function bumpChip() {
+  const chip = document.querySelector(".points");
+  if (chip) {
+    chip.classList.add("bump");
+    setTimeout(() => chip.classList.remove("bump"), 300);
+  }
+}
+
+// ====== BOOT ======
+document.addEventListener("DOMContentLoaded", async () => {
+  renderIdentity();
+  renderPoints(0);
 
   if (IS_HOME) {
     const fileInput = $("fileInput");
     if (fileInput) fileInput.addEventListener("change", onFileSelected);
 
-    // Footer info
     $("footerInfo")?.addEventListener("click", openReview);
 
-    // Welcome modal on first visit
     if (!getName()) {
       openModal("welcomeModal");
       setTimeout(() => $("nameInput")?.focus(), 200);
@@ -75,18 +115,18 @@ document.addEventListener("DOMContentLoaded", () => {
         if (e.key === "Enter") saveName();
       });
     }
+
+    // Pull points from backend on load
+    await refreshPoints();
   }
 
   if (IS_LB) loadLeaderboard();
 
-  // Backdrop click closes modals
   document.querySelectorAll(".modal-backdrop").forEach((bd) => {
     bd.addEventListener("click", (e) => {
       if (e.target === bd) closeModal(bd.id);
     });
   });
-
-  // Escape key
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
       document.querySelectorAll(".modal-backdrop:not(.hidden)").forEach((bd) => closeModal(bd.id));
@@ -98,20 +138,26 @@ async function saveName() {
   const input = $("nameInput");
   const name = (input?.value || "").trim();
   if (!name) { input?.focus(); return; }
-  await setName(name);
+
+  const btn = document.querySelector(".modal-btn");
+  const original = btn?.textContent;
+  if (btn) { btn.disabled = true; btn.textContent = "Saving…"; }
+
+  const ok = await setName(name);
+  if (btn) { btn.disabled = false; btn.textContent = original; }
+
+  if (!ok) { alert("Could not save your name. Please try again."); return; }
   closeModal("welcomeModal");
 }
 
 // ====== MODALS ======
 function openModal(id) {
-  const el = $(id);
-  if (!el) return;
+  const el = $(id); if (!el) return;
   el.classList.remove("hidden");
   document.body.classList.add("modal-open");
 }
 function closeModal(id) {
-  const el = $(id);
-  if (!el) return;
+  const el = $(id); if (!el) return;
   el.classList.add("hidden");
   if (!document.querySelector(".modal-backdrop:not(.hidden)")) {
     document.body.classList.remove("modal-open");
@@ -120,21 +166,6 @@ function closeModal(id) {
 function openReview() { openModal("reviewModal"); }
 function closeReview() { closeModal("reviewModal"); }
 
-// ====== POINTS ======
-function getPoints() { return parseInt(localStorage.getItem(POINTS_KEY) || "0", 10); }
-function setPoints(v) {
-  localStorage.setItem(POINTS_KEY, String(v));
-  renderPoints();
-  const el = document.querySelector(".points");
-  if (el) { el.classList.add("bump"); setTimeout(() => el.classList.remove("bump"), 300); }
-}
-function renderPoints() {
-  const el = $("pointsValue");
-  if (!el) return;
-  const v = getPoints();
-  el.textContent = v > 0 ? `+${v}` : v;
-}
-
 // ====== MODEL ======
 async function ensureModel() {
   if (model) return;
@@ -142,20 +173,31 @@ async function ensureModel() {
   maxPredictions = model.getTotalClasses();
 }
 
-// ====== UPLOAD ======
+// ====== UPLOAD → AUTO ANALYZE ======
 function triggerUpload() {
   const fileInput = $("fileInput");
   if (!fileInput) return;
   fileInput.value = "";
   fileInput.click();
 }
+
 function onFileSelected(e) {
   const file = e.target.files?.[0];
   if (!file) return;
+
   const reader = new FileReader();
-  reader.onload = () => {
-    $("previewImg").src = reader.result;
+  reader.onload = async () => {
+    const img = $("previewImg");
+    img.src = reader.result;
     switchState("statePreview");
+
+    await new Promise((resolve) => {
+      if (img.complete) return resolve();
+      img.onload = () => resolve();
+      img.onerror = () => resolve();
+    });
+
+    classifyPreview();
   };
   reader.readAsDataURL(file);
 }
@@ -168,14 +210,16 @@ async function classifyPreview() {
   const btn = $("analyzeBtn");
   const fill = $("waveFill");
   const scanLine = $("scanLine");
-  btn.classList.add("busy");
-  btn.querySelector(".btn-label").textContent = "Analyzing…";
+  if (btn) {
+    btn.classList.add("busy");
+    btn.querySelector(".btn-label").textContent = "Analyzing…";
+  }
   scanLine?.classList.remove("hidden");
 
   let progress = 0;
   const tick = setInterval(() => {
     progress = Math.min(progress + Math.random() * 12, 90);
-    fill.style.setProperty("--fill", progress + "%");
+    fill?.style.setProperty("--fill", progress + "%");
   }, 200);
 
   try {
@@ -188,11 +232,12 @@ async function classifyPreview() {
     alert("Could not analyze this image.");
   } finally {
     clearInterval(tick);
-    fill.style.setProperty("--fill", "100%");
+    fill?.style.setProperty("--fill", "100%");
     setTimeout(() => {
-      fill.style.setProperty("--fill", "0%");
-      btn.classList.remove("busy");
-      btn.querySelector(".btn-label").textContent = "Analyze";
+      fill?.style.setProperty("--fill", "0%");
+      btn?.classList.remove("busy");
+      const label = btn?.querySelector(".btn-label");
+      if (label) label.textContent = "Analyze";
       scanLine?.classList.add("hidden");
       isBusy = false;
     }, 350);
@@ -224,7 +269,6 @@ async function handleImage(inputEl, dataUrl) {
   const delta =
     top.className === WASTE_CLASS ? +100 :
     top.className === GOOD_CLASS  ? -500 : 0;
-  setPoints(getPoints() + delta);
 
   const deltaEl = $("deltaText");
   deltaEl.textContent = delta > 0 ? `+${delta} points` : `${delta} points`;
@@ -242,11 +286,35 @@ async function handleImage(inputEl, dataUrl) {
     });
   });
 
+  // 1. Upload image to Cloudinary
   const confidence = Math.round(top.probability * 100);
-  const imageUrl = await uploadToCloudinary(dataUrl, top.className, confidence)
-    .catch((e) => { console.warn("Cloudinary upload failed:", e); return null; });
+  let imageUrl = null;
+  try {
+    imageUrl = await uploadToCloudinary(dataUrl, top.className, confidence);
+    console.log("[cloudinary] uploaded", imageUrl);
+  } catch (e) {
+    console.warn("[cloudinary] failed", e);
+    const note = document.querySelector(".review-note");
+    if (note) note.textContent = "⚠ Upload failed — points not applied. Please try again.";
+    return;
+  }
 
-  saveSubmission({ label: top.className, confidence, points: delta, image_url: imageUrl });
+  // 2. Insert into Supabase (backend owns points now)
+  const saved = await saveSubmission({
+    label: top.className,
+    confidence,
+    points: delta,
+    image_url: imageUrl,
+  });
+
+  if (!saved) {
+    console.warn("[supabase] submission not saved, but image is safe:", imageUrl);
+    return;
+  }
+
+  // 3. Reconcile points directly from backend
+  await refreshPoints();
+  bumpChip();
 }
 
 // ====== CLOUDINARY ======
@@ -272,30 +340,35 @@ async function uploadToCloudinary(dataUrl, label, confidence) {
   return data.secure_url;
 }
 
-// ====== SUPABASE ======
+// ====== SUPABASE INSERT ======
 async function saveSubmission({ label, confidence, points, image_url }) {
-  const { error } = await sb.from("submissions").insert({
+  const { data, error } = await sb.from("submissions").insert({
     identity: getIdentity(),
     name: getName() || "Guest",
     device_id: getDeviceId(),
     label, confidence, points, image_url,
-  });
-  if (error) console.warn("Supabase insert failed:", error);
+  }).select();
+
+  if (error) { console.warn("[submission] insert failed", error); return false; }
+  console.log("[submission] saved", data);
+  return true;
 }
 
-// ====== LEADERBOARD ======
+// ====== LEADERBOARD (from backend) ======
 async function loadLeaderboard() {
   const list = $("lbList");
   if (!list) return;
   list.innerHTML = `<p class="lb-empty">Loading…</p>`;
 
+  // Fetch the pre-aggregated leaderboard view from Supabase
   const { data, error } = await sb
     .from("leaderboard")
-    .select("*")
+    .select("identity, name, total_points, submissions")
+    .order("total_points", { ascending: false })
     .limit(100);
 
   if (error) {
-    console.error(error);
+    console.error("[lb] fetch failed", error);
     list.innerHTML = `<p class="lb-empty">Could not load leaderboard.</p>`;
     return;
   }
@@ -324,7 +397,6 @@ async function loadLeaderboard() {
     list.appendChild(el);
   });
 
-  // Your rank card at bottom
   const mineBox = $("lbMine");
   if (mineBox && myRow) {
     mineBox.classList.remove("hidden");
@@ -332,6 +404,13 @@ async function loadLeaderboard() {
     $("myName").textContent = myRow.name;
     $("myPts").textContent = (myRow.total_points > 0 ? "+" : "") + myRow.total_points;
     $("mySubs").textContent = myRow.submissions + " scans";
+  } else if (mineBox) {
+    // No submissions yet — show placeholder row
+    mineBox.classList.remove("hidden");
+    $("myRank").textContent = "—";
+    $("myName").textContent = getName() || "Guest";
+    $("myPts").textContent = "0";
+    $("mySubs").textContent = "0 scans";
   }
 }
 
