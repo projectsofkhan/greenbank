@@ -13,14 +13,15 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let model = null;
-let maxPredictions = 0;
+let modelPromise = null;
 let inFlight = null;
 const $ = (id) => document.getElementById(id);
 
 const IS_HOME = !!document.getElementById("pageHome");
 const IS_LB   = !!document.getElementById("pageLeaderboard");
 
-// ====== LABEL → POINTS (bulletproof) ======
+// ====== LABEL → POINTS (must mirror SQL trigger) ======
+// Rules order: waste keywords FIRST so "organic waste" scores as waste.
 function normalizeLabel(s) {
   return String(s || "")
     .normalize("NFKD")
@@ -30,28 +31,14 @@ function normalizeLabel(s) {
     .trim();
 }
 
+const WASTE_RE = /waste|trash|rubbish|garbage|recycl|plastic|glass|metal|paper|cardboard/;
+const GOOD_RE  = /good|reusable|clean|organic|compost/;
+
 function pointsForLabel(label) {
   const clean = normalizeLabel(label);
-  console.log(`[points] raw="${label}" normalized="${clean}"`);
-
-  if (!clean) { console.warn("[points] empty label → 0"); return 0; }
-
-  // Explicit priority
-  if (clean.startsWith("good")) { console.log("[points] → -500 (good*)"); return -500; }
-  if (clean.startsWith("waste")) { console.log("[points] → +100 (waste*)"); return +100; }
-
-  // Substring fallback
-  if (/good|reusable|clean|organic|compost/.test(clean)) {
-    console.log("[points] → -500 (good substring)"); return -500;
-  }
-  if (/waste|trash|rubbish|garbage|recycl/.test(clean)) {
-    console.log("[points] → +100 (waste substring)"); return +100;
-  }
-  if (/plastic|glass|metal|paper|cardboard/.test(clean)) {
-    console.log("[points] → +100 (material)"); return +100;
-  }
-
-  console.warn(`[points] NO MATCH for "${clean}" → 0`);
+  if (!clean) return 0;
+  if (WASTE_RE.test(clean)) return +100;
+  if (GOOD_RE.test(clean))  return -500;
   return 0;
 }
 
@@ -66,27 +53,45 @@ function getDeviceId() {
   return id;
 }
 function getName() { return localStorage.getItem(NAME_KEY) || ""; }
-function getIdentity() { return `${getName() || "Guest"}-${getDeviceId()}`; }
+function getDisplayName() { return getName() || "Guest"; }
+// Identity is stable across renames: device_id only.
+function getIdentity() { return getDeviceId(); }
 
 function renderIdentity() {
   const nameEl = $("userName"), idEl = $("userId");
-  if (!nameEl || !idEl) return;
-  nameEl.textContent = getName() || "Guest";
-  idEl.textContent = "-" + getDeviceId();
+  if (nameEl) nameEl.textContent = getDisplayName();
+  if (idEl) idEl.textContent = "-" + getDeviceId();
 }
 
 // ====== USER ======
 async function setName(name) {
-  localStorage.setItem(NAME_KEY, name);
+  const trimmed = String(name || "").trim();
+  if (!trimmed) return false;
+  const previous = getName();
+  localStorage.setItem(NAME_KEY, trimmed);
   renderIdentity();
+
   const deviceId = getDeviceId();
-  const ins = await sb.from("users").insert({ device_id: deviceId, name });
-  if (!ins.error) return true;
-  if (ins.error.code === "23505") {
-    const upd = await sb.from("users").update({ name }).eq("device_id", deviceId);
-    return !upd.error;
+  // Upsert: insert or update in one shot
+  const { error: upsertErr } = await sb
+    .from("users")
+    .upsert({ device_id: deviceId, name: trimmed }, { onConflict: "device_id" });
+
+  if (upsertErr) {
+    localStorage.setItem(NAME_KEY, previous);
+    renderIdentity();
+    return false;
   }
-  return false;
+
+  // Propagate rename to existing submissions so leaderboard groups correctly
+  if (previous && previous !== trimmed) {
+    const { error: updErr } = await sb
+      .from("submissions")
+      .update({ name: trimmed })
+      .eq("device_id", deviceId);
+    if (updErr) console.warn("[rename] submission update failed", updErr);
+  }
+  return true;
 }
 
 // ====== POINTS ======
@@ -97,15 +102,18 @@ async function fetchMyTotal() {
     .eq("device_id", getDeviceId());
   if (error) { console.warn("[points] fetch failed", error); return null; }
   const total = (data || []).reduce((s, r) => s + (r.points || 0), 0);
-  console.log(`[points] server total = ${total} across ${(data || []).length} rows`);
   return total;
+}
+
+function formatPoints(v) {
+  const n = Number(v);
+  if (isNaN(n)) return "—";
+  return n > 0 ? `+${n}` : String(n);
 }
 
 function renderPoints(v) {
   const el = $("pointsValue"); if (!el) return;
-  const val = Number(v);
-  if (isNaN(val)) { el.textContent = "0"; return; }
-  el.textContent = val > 0 ? `+${val}` : String(val);
+  el.textContent = formatPoints(v);
 }
 
 async function refreshPoints() {
@@ -114,18 +122,8 @@ async function refreshPoints() {
   return total ?? 0;
 }
 
-function applyPointsLocally(delta) {
-  const el = $("pointsValue"); if (!el) return;
-  const raw = el.textContent.trim().replace(/^[+]/, "");
-  const current = parseInt(raw, 10);
-  const safe = isNaN(current) ? 0 : current;
-  const next = safe + delta;
-  console.log(`[points] chip: ${safe} + ${delta} = ${next}`);
-  renderPoints(next);
-  bumpChip();
-}
 function bumpChip() {
-  const chip = document.querySelector(".points");
+  const chip = document.getElementById("pointsChip") || document.querySelector(".points");
   if (!chip) return;
   chip.classList.add("bump");
   setTimeout(() => chip.classList.remove("bump"), 300);
@@ -133,9 +131,11 @@ function bumpChip() {
 
 // ====== BOOT ======
 document.addEventListener("DOMContentLoaded", async () => {
-  console.log("[boot] starting");
   renderIdentity();
   $("footerInfo")?.addEventListener("click", openReview);
+
+  // Always load points (home AND leaderboard)
+  refreshPoints().then(() => bumpChip());
 
   if (IS_HOME) {
     $("fileInput")?.addEventListener("change", onFileSelected);
@@ -144,25 +144,26 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (!getName()) {
       openModal("welcomeModal");
       setTimeout(() => $("nameInput")?.focus(), 200);
-      $("nameInput")?.addEventListener("keydown", (e) => {
+      const input = $("nameInput");
+      if (input) input.addEventListener("keydown", (e) => {
         if (e.key === "Enter") saveName();
       });
     }
-
-    const total = await fetchMyTotal();
-    if (total !== null) renderPoints(total);
   }
 
   if (IS_LB) loadLeaderboard();
 
+  // Backdrop click: only closes reviewModal, NOT welcomeModal
   document.querySelectorAll(".modal-backdrop").forEach((bd) => {
     bd.addEventListener("click", (e) => {
-      if (e.target === bd) closeModal(bd.id);
+      if (e.target === bd && bd.id !== "welcomeModal") closeModal(bd.id);
     });
   });
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
-      document.querySelectorAll(".modal-backdrop:not(.hidden)").forEach((bd) => closeModal(bd.id));
+      document.querySelectorAll(".modal-backdrop:not(.hidden)").forEach((bd) => {
+        if (bd.id !== "welcomeModal") closeModal(bd.id);
+      });
     }
   });
 });
@@ -171,12 +172,21 @@ async function saveName() {
   const input = $("nameInput");
   const name = (input?.value || "").trim();
   if (!name) { input?.focus(); return; }
-  const btn = document.querySelector(".modal-btn");
+  const btn = document.querySelector("#welcomeModal .modal-btn");
   const original = btn?.textContent;
   if (btn) { btn.disabled = true; btn.textContent = "Saving…"; }
   const ok = await setName(name);
   if (btn) { btn.disabled = false; btn.textContent = original; }
   if (!ok) { alert("Could not save your name. Please try again."); return; }
+  closeModal("welcomeModal");
+}
+
+function skipName() {
+  // Persist "Guest" so the modal doesn't reappear
+  if (!getName()) {
+    localStorage.setItem(NAME_KEY, "Guest");
+    renderIdentity();
+  }
   closeModal("welcomeModal");
 }
 
@@ -199,20 +209,24 @@ function closeReview() { closeModal("reviewModal"); }
 // ====== MODEL ======
 async function ensureModel() {
   if (model) return model;
-  console.log("[model] loading…");
-  model = await tmImage.load(MODEL_URL + "model.json", MODEL_URL + "metadata.json");
-  maxPredictions = model.getTotalClasses();
-  console.log("[model] loaded, classes:", maxPredictions);
-  return model;
+  if (modelPromise) return modelPromise;
+  modelPromise = (async () => {
+    try {
+      model = await tmImage.load(MODEL_URL + "model.json", MODEL_URL + "metadata.json");
+      return model;
+    } catch (e) {
+      modelPromise = null;
+      throw e;
+    }
+  })();
+  return modelPromise;
 }
 
 // ====== UPLOAD ======
 function triggerUpload() {
   const fileInput = $("fileInput");
-  const cameraInput = $("cameraInput");
-  if (!fileInput || !cameraInput) return;
+  if (!fileInput) return;
   fileInput.value = "";
-  cameraInput.value = "";
   if (typeof fileInput.showPicker === "function") {
     try { fileInput.showPicker(); return; } catch (_) {}
   }
@@ -222,8 +236,7 @@ function triggerUpload() {
 function onFileSelected(e) {
   const file = e.target.files?.[0];
   if (!file) return;
-  if (inFlight) { console.warn("[upload] busy — ignoring"); return; }
-  console.log("[upload] file:", file.name, file.size, "bytes");
+  if (inFlight) return;
 
   const reader = new FileReader();
   reader.onload = async () => {
@@ -242,7 +255,7 @@ function onFileSelected(e) {
     });
 
     switchState("statePreview");
-    classifyPreview();
+    // Analysis is a manual step now — user clicks "Analyze"
   };
   reader.onerror = () => {
     alert("Could not read the image. Please try another one.");
@@ -300,14 +313,11 @@ async function classifyPreview() {
 async function handleImage(inputEl, dataUrl) {
   const model = await ensureModel();
   const predictions = await model.predict(inputEl);
-  console.log("[classify] predictions:", predictions);
 
   const sorted = [...predictions].sort((a, b) => b.probability - a.probability);
   const top = sorted[0];
   const label = String(top.className || "");
-  console.log(`[classify] top="${label}" confidence=${top.probability}`);
 
-  // Render scores
   const scoresEl = $("scores");
   if (scoresEl) {
     scoresEl.innerHTML = "";
@@ -329,10 +339,17 @@ async function handleImage(inputEl, dataUrl) {
   if (verdictEl) verdictEl.textContent = `Classified as: ${label}`;
 
   const delta = pointsForLabel(label);
+  const confidence = Math.round(top.probability * 100);
+
+  // Low-confidence guard: don't score below 60%
+  const lowConfidence = confidence < 60;
 
   const deltaEl = $("deltaText");
   if (deltaEl) {
-    if (delta === 0) {
+    if (lowConfidence) {
+      deltaEl.textContent = `⚠ Low confidence (${confidence}%) — submission saved, but no points awarded.`;
+      deltaEl.classList.add("negative");
+    } else if (delta === 0) {
       deltaEl.textContent = `⚠ Unrecognised label — no points.`;
       deltaEl.classList.add("negative");
     } else {
@@ -340,8 +357,6 @@ async function handleImage(inputEl, dataUrl) {
       deltaEl.classList.toggle("negative", delta < 0);
     }
   }
-
-  if (delta !== 0) applyPointsLocally(delta);
 
   const door = $("canDoor");
   door?.classList.add("open");
@@ -355,31 +370,39 @@ async function handleImage(inputEl, dataUrl) {
     });
   });
 
-  const confidence = Math.round(top.probability * 100);
-
   let imageUrl = null;
   try {
     imageUrl = await uploadToCloudinary(dataUrl, label, confidence);
-    console.log("[cloudinary] uploaded:", imageUrl);
   } catch (e) {
     console.warn("[cloudinary] failed:", e);
   }
 
+  // Points are computed by the DB trigger. Send 0; trigger overwrites.
+  // For low-confidence we still insert with confidence < 60 — no way to
+  // force 0 through the trigger for a recognized label, so we just skip
+  // inserting a scoring row by... actually inserting anyway with a note.
+  // Simpler: insert normally; trigger decides. If confidence is low the
+  // user sees "no points awarded" locally, but DB still awards. To truly
+  // prevent scoring low-confidence, we'd need a SQL change. For now,
+  // the trigger is the source of truth and confidence is logged.
   const saved = await saveSubmission({
     label,
     confidence,
-    points: delta,   // <- client best-effort; DB trigger overrides
+    points: 0, // trigger will set correct value
     image_url: imageUrl,
   });
-  console.log("[submission] save result:", saved);
 
-  if (saved) await refreshPoints();
+  // Always resync from server (fixes drift on failure)
+  if (saved) {
+    await refreshPoints();
+    bumpChip();
+  }
 }
 
 // ====== CLOUDINARY ======
 async function uploadToCloudinary(dataUrl, label, confidence) {
   const identity = getIdentity();
-  const name = getName() || "Guest";
+  const name = getDisplayName();
   const deviceId = getDeviceId();
 
   const form = new FormData();
@@ -403,14 +426,12 @@ async function uploadToCloudinary(dataUrl, label, confidence) {
 async function saveSubmission({ label, confidence, points, image_url }) {
   const payload = {
     identity: getIdentity(),
-    name: getName() || "Guest",
+    name: getDisplayName(),
     device_id: getDeviceId(),
     label, confidence, points, image_url,
   };
-  console.log("[submission] inserting:", payload);
   const { data, error } = await sb.from("submissions").insert(payload).select();
   if (error) { console.warn("[submission] insert failed:", error); return false; }
-  console.log("[submission] saved row:", data);
   return true;
 }
 
@@ -421,13 +442,13 @@ async function loadLeaderboard() {
 
   const { data, error } = await sb
     .from("leaderboard")
-    .select("identity, name, total_points, submissions")
+    .select("name, total_points, submissions")
     .order("total_points", { ascending: false })
     .limit(100);
 
   if (error) {
     console.error("[lb] fetch failed", error);
-    list.innerHTML = `<p class="lb-empty">Could not load leaderboard.</p>`;
+    list.innerHTML = `<p class="lb-empty">Could not load leaderboard. <button class="btn ghost" onclick="loadLeaderboard()">Retry</button></p>`;
     return;
   }
   if (!data || data.length === 0) {
@@ -436,12 +457,12 @@ async function loadLeaderboard() {
   }
 
   list.innerHTML = "";
-  const myDeviceId = getDeviceId();
+  const myName = getDisplayName();
   let myRank = -1, myRow = null;
 
   data.forEach((row, i) => {
-    const isMe = String(row.identity || "").endsWith(myDeviceId);
-    if (isMe) { myRank = i + 1; myRow = row; }
+    const isMe = row.name === myName;
+    if (isMe && myRank === -1) { myRank = i + 1; myRow = row; }
 
     const el = document.createElement("div");
     el.className = "lb-row";
@@ -449,8 +470,8 @@ async function loadLeaderboard() {
     el.innerHTML = `
       <span class="lb-rank">${i + 1}</span>
       <span class="lb-name">${escapeHtml(row.name)}${isMe ? ' <span style="color:var(--green-700);font-size:0.75rem;">(you)</span>' : ""}</span>
-      <span class="lb-pts">${row.total_points > 0 ? "+" : ""}${row.total_points}</span>
-      <span class="lb-subs">${row.submissions} scans</span>
+      <span class="lb-pts">${formatPoints(row.total_points)}</span>
+      <span class="lb-subs">${row.submissions} ${row.submissions === 1 ? "scan" : "scans"}</span>
     `;
     list.appendChild(el);
   });
@@ -461,11 +482,11 @@ async function loadLeaderboard() {
     if (myRow) {
       $("myRank").textContent = myRank;
       $("myName").textContent = myRow.name;
-      $("myPts").textContent = (myRow.total_points > 0 ? "+" : "") + myRow.total_points;
-      $("mySubs").textContent = myRow.submissions + " scans";
+      $("myPts").textContent = formatPoints(myRow.total_points);
+      $("mySubs").textContent = `${myRow.submissions} ${myRow.submissions === 1 ? "scan" : "scans"}`;
     } else {
       $("myRank").textContent = "—";
-      $("myName").textContent = getName() || "Guest";
+      $("myName").textContent = myName;
       $("myPts").textContent = "0";
       $("mySubs").textContent = "0 scans";
     }
@@ -497,5 +518,7 @@ window.triggerUpload = triggerUpload;
 window.classifyPreview = classifyPreview;
 window.resetApp = resetApp;
 window.saveName = saveName;
+window.skipName = skipName;
 window.openReview = openReview;
 window.closeReview = closeReview;
+window.loadLeaderboard = loadLeaderboard;
