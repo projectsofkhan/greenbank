@@ -47,7 +47,6 @@
     <section class="panel">
       <div class="panel-inner">
 
-        <!-- Idle -->
         <div class="state" id="stateIdle">
           <h1>Ready when you are.</h1>
           <p class="muted">Upload a photo of the item — we'll classify it instantly.</p>
@@ -62,24 +61,18 @@
               Upload Image
             </button>
 
-            <button class="info-btn" id="reviewBtn" onclick="toggleReview()" aria-label="How review works">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <button class="info-btn" id="reviewBtn" onclick="openReview()" aria-label="How review works">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="12" cy="12" r="10"/>
                 <line x1="12" y1="16" x2="12" y2="12"/>
                 <line x1="12" y1="8" x2="12.01" y2="8"/>
               </svg>
             </button>
-
-            <div class="review-pop" id="reviewPop">
-              <strong>How review works</strong>
-              <p>Your image is uploaded to our server. Our team checks whether the classification is correct — if yes, points are applied; if not, no points are changed.</p>
-            </div>
           </div>
 
           <input type="file" id="fileInput" accept="image/*" hidden />
         </div>
 
-        <!-- Preview -->
         <div class="state hidden" id="statePreview">
           <div class="cam-frame">
             <img id="previewImg" alt="Preview" style="width:100%;height:100%;object-fit:cover;" />
@@ -94,7 +87,6 @@
           </div>
         </div>
 
-        <!-- Result -->
         <div class="state hidden" id="stateResult">
           <h2 class="result-title">Result</h2>
           <div class="scores" id="scores"></div>
@@ -115,14 +107,10 @@
   <footer class="footer">
     <p>
       Green Bank classifies items with an on-device model.
-      <span class="info-icon" tabindex="0" aria-describedby="infoTip">i</span>
+      <span class="info-icon" id="footerInfo" tabindex="0" role="button">i</span>
     </p>
-    <div class="info-tip" id="infoTip" role="tooltip">
-      Results are automated and may be incorrect. Our team will check each submission manually to confirm your points.
-    </div>
   </footer>
 
-  <!-- Mobile bottom nav -->
   <nav class="bottom-nav">
     <a href="index.html" class="bn-item active">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -147,6 +135,25 @@
       <input type="text" id="nameInput" placeholder="Your name" maxlength="24" autocomplete="off" />
       <button class="btn primary modal-btn" onclick="saveName()">Continue</button>
       <p class="modal-hint">Saved on this device only.</p>
+    </div>
+  </div>
+
+  <!-- Review modal -->
+  <div class="modal-backdrop hidden" id="reviewModal">
+    <div class="modal modal-info">
+      <button class="modal-close" onclick="closeReview()" aria-label="Close">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <line x1="18" y1="6" x2="6" y2="18"/>
+          <line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+      <h2>How review works</h2>
+      <p class="modal-info-text">
+        Your image is uploaded to our server. Our team checks whether the classification is correct — if yes, points are applied; if not, no points are changed.
+      </p>
+      <p class="modal-info-text">
+        Results are automated and may be incorrect. Every submission is checked manually.
+      </p>
     </div>
   </div>
 
