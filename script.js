@@ -1,4 +1,4 @@
-const URL = "./my_model/";
+const URL = "";
 const POINTS_KEY = "greenbank.points";
 const WASTE_CLASS = "Waste";          // +100
 const GOOD_CLASS = "Good Material";   // -500
