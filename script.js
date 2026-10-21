@@ -102,11 +102,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   renderIdentity();
   renderPoints(0);
 
+  // Footer info works on both pages
+  $("footerInfo")?.addEventListener("click", openReview);
+
   if (IS_HOME) {
     const fileInput = $("fileInput");
     if (fileInput) fileInput.addEventListener("change", onFileSelected);
-
-    $("footerInfo")?.addEventListener("click", openReview);
 
     if (!getName()) {
       openModal("welcomeModal");
@@ -360,7 +361,6 @@ async function loadLeaderboard() {
   if (!list) return;
   list.innerHTML = `<p class="lb-empty">Loading…</p>`;
 
-  // Fetch the pre-aggregated leaderboard view from Supabase
   const { data, error } = await sb
     .from("leaderboard")
     .select("identity, name, total_points, submissions")
@@ -405,7 +405,6 @@ async function loadLeaderboard() {
     $("myPts").textContent = (myRow.total_points > 0 ? "+" : "") + myRow.total_points;
     $("mySubs").textContent = myRow.submissions + " scans";
   } else if (mineBox) {
-    // No submissions yet — show placeholder row
     mineBox.classList.remove("hidden");
     $("myRank").textContent = "—";
     $("myName").textContent = getName() || "Guest";
