@@ -1,25 +1,35 @@
 // ====== CONFIG ======
-const MODEL_URL = "./";                     // model files are in the root
+const MODEL_URL = "./";
 const POINTS_KEY = "greenbank.points";
-const WASTE_CLASS = "Waste";                // +100
-const GOOD_CLASS  = "Good Material";        // -500
+const DEVICE_KEY = "greenbank.device";
+const WASTE_CLASS = "Waste";
+const GOOD_CLASS  = "Good Material";
 
 const CLOUD_NAME    = "fc5nj83m";
 const UPLOAD_PRESET = "ml_default";
 const CLOUD_FOLDER  = "greenbank";
 
-let model, webcam, maxPredictions;
+let model, maxPredictions;
 const $ = (id) => document.getElementById(id);
+
+// ====== DEVICE ID (identifies each phone/browser) ======
+// Generated once per browser, stored forever in localStorage.
+// Lets your team know which device sent which image.
+function getDeviceId() {
+  let id = localStorage.getItem(DEVICE_KEY);
+  if (!id) {
+    id = "dev_" + Math.random().toString(36).slice(2, 8) +
+         Date.now().toString(36).slice(-4);
+    localStorage.setItem(DEVICE_KEY, id);
+  }
+  return id;
+}
 
 // ====== POINTS ======
 document.addEventListener("DOMContentLoaded", () => {
   renderPoints();
-
-  // Wire the hidden file input once, on load
   const fileInput = $("fileInput");
-  if (fileInput) {
-    fileInput.addEventListener("change", onFileSelected);
-  }
+  if (fileInput) fileInput.addEventListener("change", onFileSelected);
 });
 
 function getPoints() {
@@ -28,49 +38,26 @@ function getPoints() {
 function setPoints(v) {
   localStorage.setItem(POINTS_KEY, String(v));
   renderPoints();
+
+  const el = document.querySelector(".points");
+  if (el) {
+    el.classList.add("bump");
+    setTimeout(() => el.classList.remove("bump"), 300);
+  }
 }
 function renderPoints() {
   const v = getPoints();
   $("pointsValue").textContent = v > 0 ? `+${v}` : v;
 }
 
-// ====== MODEL LOAD ======
+// ====== MODEL ======
 async function ensureModel() {
   if (model) return;
-  const modelURL    = MODEL_URL + "model.json";
-  const metadataURL = MODEL_URL + "metadata.json";
-  model = await tmImage.load(modelURL, metadataURL);
+  model = await tmImage.load(MODEL_URL + "model.json", MODEL_URL + "metadata.json");
   maxPredictions = model.getTotalClasses();
 }
 
-// ====== CAMERA ======
-async function startCamera() {
-  try {
-    await ensureModel();
-
-    webcam = new tmImage.Webcam(300, 300, true);
-    await webcam.setup();
-    await webcam.play();
-
-    const container = $("webcam-container");
-    container.innerHTML = "";
-    container.appendChild(webcam.canvas);
-
-    switchState("stateCamera");
-  } catch (err) {
-    console.error(err);
-    alert("Could not start the camera. Please allow camera access and try again.");
-  }
-}
-
-async function capture() {
-  webcam.update();
-  const canvas = webcam.canvas;
-  const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
-  await handleImage(canvas, dataUrl);
-}
-
-// ====== UPLOAD ======
+// ====== UPLOAD TRIGGER ======
 function triggerUpload() {
   const fileInput = $("fileInput");
   fileInput.value = "";
@@ -96,15 +83,14 @@ async function classifyPreview() {
     const img = $("previewImg");
     if (!img.complete) await new Promise((r) => (img.onload = r));
 
-    const dataUrl = img.src;
-    await handleImage(img, dataUrl);
+    await handleImage(img, img.src);
   } catch (err) {
     console.error(err);
     alert("Could not analyze this image.");
   }
 }
 
-// ====== SHARED PIPELINE ======
+// ====== PIPELINE ======
 async function handleImage(inputEl, dataUrl) {
   const predictions = await model.predict(inputEl);
   const sorted = [...predictions].sort((a, b) => b.probability - a.probability);
@@ -112,13 +98,14 @@ async function handleImage(inputEl, dataUrl) {
 
   const scoresEl = $("scores");
   scoresEl.innerHTML = "";
-  sorted.forEach((p) => {
+  sorted.forEach((p, i) => {
     const pct = Math.round(p.probability * 100);
     const row = document.createElement("div");
     row.className = "score-row";
+    row.style.animationDelay = `${i * 60}ms`;
     row.innerHTML = `
       <span class="score-label">${p.className}</span>
-      <span class="score-bar"><span class="score-fill" style="width:${pct}%"></span></span>
+      <span class="score-bar"><span class="score-fill" data-pct="${pct}"></span></span>
       <span class="score-pct">${pct}%</span>
     `;
     scoresEl.appendChild(row);
@@ -140,6 +127,13 @@ async function handleImage(inputEl, dataUrl) {
 
   switchState("stateResult");
 
+  // Animate bars after they render
+  requestAnimationFrame(() => {
+    document.querySelectorAll(".score-fill").forEach((el) => {
+      el.style.width = el.dataset.pct + "%";
+    });
+  });
+
   uploadToCloudinary(dataUrl, top.className, Math.round(top.probability * 100))
     .catch((e) => console.warn("Cloudinary upload failed:", e));
 }
@@ -151,33 +145,41 @@ async function uploadToCloudinary(dataUrl, label, confidence) {
   form.append("upload_preset", UPLOAD_PRESET);
   form.append("folder", CLOUD_FOLDER);
   form.append("tags", `greenbank,${label.replace(/\s+/g, "_")},conf_${confidence}`);
-  form.append("context", `label=${label}|confidence=${confidence}`);
+  form.append("context",
+    `label=${label}|confidence=${confidence}|device_id=${getDeviceId()}`);
 
   const res = await fetch(
     `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
     { method: "POST", body: form }
   );
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Cloudinary ${res.status}: ${text}`);
-  }
+  if (!res.ok) throw new Error(`Cloudinary ${res.status}: ${await res.text()}`);
   return res.json();
 }
 
-// ====== STATE SWITCHER ======
+// ====== STATE ======
 function switchState(id) {
-  ["stateIdle", "stateCamera", "statePreview", "stateResult"].forEach((s) =>
+  ["stateIdle", "statePreview", "stateResult"].forEach((s) =>
     $(s).classList.add("hidden")
   );
   $(id).classList.remove("hidden");
 }
 
 function resetApp() {
-  if (webcam) {
-    try { webcam.stop(); } catch (_) {}
-    webcam = null;
-  }
-  $("webcam-container").innerHTML = "";
   $("previewImg").src = "";
   switchState("stateIdle");
 }
+
+// ====== INFO POPUP ======
+function toggleReview() {
+  $("reviewPop").classList.toggle("open");
+}
+
+// Close popup when clicking elsewhere
+document.addEventListener("click", (e) => {
+  const pop = $("reviewPop");
+  const btn = $("reviewBtn");
+  if (!pop || !btn) return;
+  if (!pop.contains(e.target) && !btn.contains(e.target)) {
+    pop.classList.remove("open");
+  }
+});
