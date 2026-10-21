@@ -18,6 +18,10 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 let model, maxPredictions, isBusy = false;
 const $ = (id) => document.getElementById(id);
 
+// Detect which page we're on
+const IS_HOME = !!document.getElementById("pageHome");
+const IS_LB   = !!document.getElementById("pageLeaderboard");
+
 // ====== IDENTITY ======
 function getDeviceId() {
   let id = localStorage.getItem(DEVICE_KEY);
@@ -44,23 +48,24 @@ document.addEventListener("DOMContentLoaded", () => {
   renderPoints();
   renderIdentity();
 
-  const fileInput = $("fileInput");
-  if (fileInput) fileInput.addEventListener("change", onFileSelected);
+  // Home-only bindings
+  if (IS_HOME) {
+    const fileInput = $("fileInput");
+    if (fileInput) fileInput.addEventListener("change", onFileSelected);
 
-  // Desktop top-nav links
-  document.querySelectorAll(".desktop-nav .nav-link").forEach((a) => {
-    a.addEventListener("click", (e) => {
-      e.preventDefault();
-      switchPage(a.dataset.page);
-    });
-  });
+    // Show name modal on first visit
+    if (!getName()) {
+      $("welcomeModal").classList.remove("hidden");
+      setTimeout(() => $("nameInput")?.focus(), 150);
+      $("nameInput")?.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") saveName();
+      });
+    }
+  }
 
-  if (!getName()) {
-    $("welcomeModal").classList.remove("hidden");
-    setTimeout(() => $("nameInput")?.focus(), 150);
-    $("nameInput")?.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") saveName();
-    });
+  // Leaderboard-only binding
+  if (IS_LB) {
+    loadLeaderboard();
   }
 });
 
@@ -72,18 +77,6 @@ function saveName() {
   $("welcomeModal").classList.add("hidden");
 }
 
-// ====== PAGE ROUTING ======
-function switchPage(page) {
-  document.querySelectorAll(".page").forEach((p) => p.classList.add("hidden"));
-  $("page" + page[0].toUpperCase() + page.slice(1)).classList.remove("hidden");
-
-  document.querySelectorAll(".nav-link, .bn-item").forEach((el) => {
-    el.classList.toggle("active", el.dataset.page === page);
-  });
-
-  if (page === "leaderboard") loadLeaderboard();
-}
-
 // ====== POINTS ======
 function getPoints() { return parseInt(localStorage.getItem(POINTS_KEY) || "0", 10); }
 function setPoints(v) {
@@ -93,8 +86,10 @@ function setPoints(v) {
   if (el) { el.classList.add("bump"); setTimeout(() => el.classList.remove("bump"), 300); }
 }
 function renderPoints() {
+  const el = $("pointsValue");
+  if (!el) return;
   const v = getPoints();
-  $("pointsValue").textContent = v > 0 ? `+${v}` : v;
+  el.textContent = v > 0 ? `+${v}` : v;
 }
 
 // ====== MODEL ======
@@ -107,6 +102,7 @@ async function ensureModel() {
 // ====== UPLOAD TRIGGER ======
 function triggerUpload() {
   const fileInput = $("fileInput");
+  if (!fileInput) return;
   fileInput.value = "";
   fileInput.click();
 }
@@ -131,9 +127,8 @@ async function classifyPreview() {
   const scanLine = $("scanLine");
   btn.classList.add("busy");
   btn.querySelector(".btn-label").textContent = "Analyzing…";
-  scanLine.classList.remove("hidden");
+  scanLine?.classList.remove("hidden");
 
-  // Fake wave progression: 0 → 90% while model runs, then 100% on done
   let progress = 0;
   const tick = setInterval(() => {
     progress = Math.min(progress + Math.random() * 12, 90);
@@ -144,7 +139,6 @@ async function classifyPreview() {
     await ensureModel();
     const img = $("previewImg");
     if (!img.complete) await new Promise((r) => (img.onload = r));
-
     await handleImage(img, img.src);
   } catch (err) {
     console.error(err);
@@ -156,7 +150,7 @@ async function classifyPreview() {
       fill.style.setProperty("--fill", "0%");
       btn.classList.remove("busy");
       btn.querySelector(".btn-label").textContent = "Analyze";
-      scanLine.classList.add("hidden");
+      scanLine?.classList.add("hidden");
       isBusy = false;
     }, 350);
   }
@@ -194,8 +188,8 @@ async function handleImage(inputEl, dataUrl) {
   deltaEl.classList.toggle("negative", delta < 0);
 
   const door = $("canDoor");
-  door.classList.add("open");
-  setTimeout(() => door.classList.remove("open"), 900);
+  door?.classList.add("open");
+  setTimeout(() => door?.classList.remove("open"), 900);
 
   switchState("stateResult");
 
@@ -256,6 +250,7 @@ async function saveSubmission({ label, confidence, points, image_url }) {
 
 async function loadLeaderboard() {
   const list = $("lbList");
+  if (!list) return;
   list.innerHTML = `<p class="lb-empty">Loading…</p>`;
 
   const { data, error } = await sb
@@ -295,19 +290,22 @@ function escapeHtml(s) {
 
 // ====== STATE ======
 function switchState(id) {
-  ["stateIdle", "statePreview", "stateResult"].forEach((s) =>
-    $(s).classList.add("hidden")
-  );
-  $(id).classList.remove("hidden");
+  ["stateIdle", "statePreview", "stateResult"].forEach((s) => {
+    const el = $(s);
+    if (el) el.classList.add("hidden");
+  });
+  const target = $(id);
+  if (target) target.classList.remove("hidden");
 }
 function resetApp() {
-  $("previewImg").src = "";
+  const img = $("previewImg");
+  if (img) img.src = "";
   switchState("stateIdle");
 }
 
 // ====== INFO POPUP ======
 function toggleReview() {
-  $("reviewPop").classList.toggle("open");
+  $("reviewPop")?.classList.toggle("open");
 }
 document.addEventListener("click", (e) => {
   const pop = $("reviewPop"), btn = $("reviewBtn");
