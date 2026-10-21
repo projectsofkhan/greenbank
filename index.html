@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Green Bank</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -17,6 +17,10 @@
       Green Bank
     </div>
     <div class="topbar-right">
+      <nav class="desktop-nav">
+        <a href="#" class="nav-link active" data-page="home">Home</a>
+        <a href="#" class="nav-link" data-page="leaderboard">Leaderboard</a>
+      </nav>
       <div class="user-chip" id="userChip" title="Your identity on this device">
         <span class="user-name" id="userName">Guest</span>
         <span class="user-id" id="userId">· —</span>
@@ -28,7 +32,8 @@
     </div>
   </header>
 
-  <main class="stage">
+  <!-- ============ HOME PAGE ============ -->
+  <main class="page" id="pageHome">
     <section class="can-wrap">
       <div class="can" id="can">
         <div class="can-lid"></div>
@@ -79,10 +84,13 @@
         <div class="state hidden" id="statePreview">
           <div class="cam-frame">
             <img id="previewImg" alt="Preview" style="width:100%;height:100%;object-fit:cover;" />
-            <div class="scan-line"></div>
+            <div class="scan-line" id="scanLine"></div>
           </div>
           <div class="cam-actions">
-            <button class="btn primary" onclick="classifyPreview()">Analyze</button>
+            <button class="btn primary wave-btn" id="analyzeBtn" onclick="classifyPreview()">
+              <span class="wave-fill" id="waveFill"></span>
+              <span class="btn-label">Analyze</span>
+            </button>
             <button class="btn ghost" onclick="resetApp()">Cancel</button>
           </div>
         </div>
@@ -105,6 +113,19 @@
     </section>
   </main>
 
+  <!-- ============ LEADERBOARD PAGE ============ -->
+  <main class="page hidden" id="pageLeaderboard">
+    <div class="lb-wrap">
+      <div class="lb-head">
+        <h1>Leaderboard</h1>
+        <p class="muted">Ranked by total points across all submissions.</p>
+      </div>
+      <div class="lb-list" id="lbList">
+        <p class="lb-empty">Loading…</p>
+      </div>
+    </div>
+  </main>
+
   <footer class="footer">
     <p>
       Green Bank classifies items with an on-device model.
@@ -115,21 +136,37 @@
     </div>
   </footer>
 
-  <!-- Welcome modal (first visit only) -->
+  <!-- Mobile bottom nav -->
+  <nav class="bottom-nav">
+    <button class="bn-item active" data-page="home" onclick="switchPage('home')">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 9.5 12 3l9 6.5V21a1 1 0 0 1-1 1h-5v-7h-6v7H4a1 1 0 0 1-1-1V9.5z"/>
+      </svg>
+      <span>Home</span>
+    </button>
+    <button class="bn-item" data-page="leaderboard" onclick="switchPage('leaderboard')">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10v5a5 5 0 0 1-10 0V4z"/>
+        <path d="M17 5h3v3a3 3 0 0 1-3 3"/><path d="M7 5H4v3a3 3 0 0 0 3 3"/>
+      </svg>
+      <span>Leaderboard</span>
+    </button>
+  </nav>
+
+  <!-- Welcome modal -->
   <div class="modal-backdrop hidden" id="welcomeModal">
     <div class="modal">
-      <h2>Welcome to Green Bank 🌱</h2>
-      <p class="muted">Tell us your name so our team can credit the right person.</p>
+      <h2>Welcome to Green Bank</h2>
+      <p class="modal-sub">What should we call you?</p>
       <input type="text" id="nameInput" placeholder="Your name" maxlength="24" autocomplete="off" />
-      <div class="modal-actions">
-        <button class="btn primary" onclick="saveName()">Continue</button>
-      </div>
-      <p class="modal-hint">No account, no password. Stored only on this device.</p>
+      <button class="btn primary modal-btn" onclick="saveName()">Continue</button>
+      <p class="modal-hint">Saved on this device only.</p>
     </div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="script.js"></script>
 </body>
 </html>
