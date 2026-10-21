@@ -20,7 +20,7 @@ const $ = (id) => document.getElementById(id);
 const IS_HOME = !!document.getElementById("pageHome");
 const IS_LB   = !!document.getElementById("pageLeaderboard");
 
-// ====== IDENTITY (local only) ======
+// ====== IDENTITY ======
 function getDeviceId() {
   let id = localStorage.getItem(DEVICE_KEY);
   if (!id) {
@@ -57,38 +57,29 @@ async function setName(name) {
     console.log("[user] updated", upd.data);
     return true;
   }
-
   console.warn("[user] insert failed", ins.error);
   return false;
 }
 
-// ====== POINTS (Supabase = source of truth) ======
+// ====== POINTS ======
 async function fetchMyTotal() {
-  const deviceId = getDeviceId();
   const { data, error } = await sb
     .from("submissions")
     .select("points")
-    .eq("device_id", deviceId);
-
+    .eq("device_id", getDeviceId());
   if (error) { console.warn("[points] fetch failed", error); return null; }
-
-  const total = (data || []).reduce((s, r) => s + (r.points || 0), 0);
-  return total;
+  return (data || []).reduce((s, r) => s + (r.points || 0), 0);
 }
-
 function renderPoints(v) {
-  const el = $("pointsValue");
-  if (!el) return;
+  const el = $("pointsValue"); if (!el) return;
   const val = v ?? 0;
   el.textContent = val > 0 ? `+${val}` : val;
 }
-
 async function refreshPoints() {
   const total = await fetchMyTotal();
   if (total !== null) renderPoints(total);
   return total ?? 0;
 }
-
 function bumpChip() {
   const chip = document.querySelector(".points");
   if (chip) {
@@ -102,12 +93,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   renderIdentity();
   renderPoints(0);
 
-  // Footer info works on both pages
   $("footerInfo")?.addEventListener("click", openReview);
 
   if (IS_HOME) {
-    const fileInput = $("fileInput");
-    if (fileInput) fileInput.addEventListener("change", onFileSelected);
+    $("fileInput")?.addEventListener("change", onFileSelected);
+    $("cameraInput")?.addEventListener("change", onFileSelected);
 
     if (!getName()) {
       openModal("welcomeModal");
@@ -116,8 +106,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (e.key === "Enter") saveName();
       });
     }
-
-    // Pull points from backend on load
     await refreshPoints();
   }
 
@@ -139,14 +127,11 @@ async function saveName() {
   const input = $("nameInput");
   const name = (input?.value || "").trim();
   if (!name) { input?.focus(); return; }
-
   const btn = document.querySelector(".modal-btn");
   const original = btn?.textContent;
   if (btn) { btn.disabled = true; btn.textContent = "Saving…"; }
-
   const ok = await setName(name);
   if (btn) { btn.disabled = false; btn.textContent = original; }
-
   if (!ok) { alert("Could not save your name. Please try again."); return; }
   closeModal("welcomeModal");
 }
@@ -174,17 +159,52 @@ async function ensureModel() {
   maxPredictions = model.getTotalClasses();
 }
 
-// ====== UPLOAD → AUTO ANALYZE ======
+// ====== UPLOAD → choose camera or gallery ======
 function triggerUpload() {
-  const fileInput = $("fileInput");
-  if (!fileInput) return;
-  fileInput.value = "";
-  fileInput.click();
+  const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+
+  // On desktop, just open the file picker (no camera option exists)
+  if (!isMobile) {
+    const fileInput = $("fileInput");
+    fileInput.value = "";
+    if (typeof fileInput.showPicker === "function") {
+      try { fileInput.showPicker(); return; } catch (_) {}
+    }
+    fileInput.click();
+    return;
+  }
+
+  // On mobile, try the native picker first (shows Camera + Gallery automatically)
+  // Detect the quirk: some devices skip straight to Files. If so, fall back to choice.
+  const supportsNativeSheet = !/Android 6|Android 7|Android 8|Android 9/i.test(navigator.userAgent);
+
+  if (supportsNativeSheet) {
+    const fileInput = $("fileInput");
+    fileInput.value = "";
+    if (typeof fileInput.showPicker === "function") {
+      try { fileInput.showPicker(); return; } catch (_) {}
+    }
+    fileInput.click();
+    return;
+  }
+
+  // Fallback for older Android: explicit native choice dialog
+  const useCamera = confirm(
+    "📷  Camera  →  tap OK\n🖼  Gallery  →  tap Cancel"
+  );
+
+  const input = useCamera ? $("cameraInput") : $("fileInput");
+  input.value = "";
+  input.click();
 }
 
 function onFileSelected(e) {
   const file = e.target.files?.[0];
   if (!file) return;
+
+  // Clear both inputs so picking the same file twice still works
+  $("fileInput").value = "";
+  $("cameraInput").value = "";
 
   const reader = new FileReader();
   reader.onload = async () => {
@@ -287,7 +307,6 @@ async function handleImage(inputEl, dataUrl) {
     });
   });
 
-  // 1. Upload image to Cloudinary
   const confidence = Math.round(top.probability * 100);
   let imageUrl = null;
   try {
@@ -300,7 +319,6 @@ async function handleImage(inputEl, dataUrl) {
     return;
   }
 
-  // 2. Insert into Supabase (backend owns points now)
   const saved = await saveSubmission({
     label: top.className,
     confidence,
@@ -313,7 +331,6 @@ async function handleImage(inputEl, dataUrl) {
     return;
   }
 
-  // 3. Reconcile points directly from backend
   await refreshPoints();
   bumpChip();
 }
@@ -355,10 +372,9 @@ async function saveSubmission({ label, confidence, points, image_url }) {
   return true;
 }
 
-// ====== LEADERBOARD (from backend) ======
+// ====== LEADERBOARD ======
 async function loadLeaderboard() {
-  const list = $("lbList");
-  if (!list) return;
+  const list = $("lbList"); if (!list) return;
   list.innerHTML = `<p class="lb-empty">Loading…</p>`;
 
   const { data, error } = await sb
@@ -421,8 +437,7 @@ function escapeHtml(s) {
 // ====== STATE ======
 function switchState(id) {
   ["stateIdle", "statePreview", "stateResult"].forEach((s) => {
-    const el = $(s);
-    if (el) el.classList.add("hidden");
+    const el = $(s); if (el) el.classList.add("hidden");
   });
   $(id)?.classList.remove("hidden");
 }
