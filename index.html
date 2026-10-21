@@ -70,7 +70,9 @@
             </button>
           </div>
 
+          <!-- Two inputs: gallery (no capture) + camera (with capture) -->
           <input type="file" id="fileInput" accept="image/*" hidden />
+          <input type="file" id="cameraInput" accept="image/*" capture="environment" hidden />
         </div>
 
         <div class="state hidden" id="statePreview">
@@ -106,8 +108,8 @@
 
   <footer class="footer">
     <p>
-      Green Bank classifies items with an on-device model.
-      <span class="info-icon" id="footerInfo" tabindex="0" role="button">i</span>
+      Points are verified by our team
+      <button class="info-icon" id="footerInfo" aria-label="How review works">i</button>
     </p>
   </footer>
 
