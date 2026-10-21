@@ -2,6 +2,7 @@
 const MODEL_URL = "./";
 const POINTS_KEY = "greenbank.points";
 const DEVICE_KEY = "greenbank.device";
+const NAME_KEY   = "greenbank.name";
 const WASTE_CLASS = "Waste";
 const GOOD_CLASS  = "Good Material";
 
@@ -12,9 +13,8 @@ const CLOUD_FOLDER  = "greenbank";
 let model, maxPredictions;
 const $ = (id) => document.getElementById(id);
 
-// ====== DEVICE ID (identifies each phone/browser) ======
-// Generated once per browser, stored forever in localStorage.
-// Lets your team know which device sent which image.
+// ====== IDENTITY ======
+// device id: persistent random string, generated once per browser
 function getDeviceId() {
   let id = localStorage.getItem(DEVICE_KEY);
   if (!id) {
@@ -25,20 +25,66 @@ function getDeviceId() {
   return id;
 }
 
-// ====== POINTS ======
+function getName() {
+  return localStorage.getItem(NAME_KEY) || "";
+}
+function setName(name) {
+  localStorage.setItem(NAME_KEY, name);
+  renderIdentity();
+}
+
+// Combined identity: "Aarav-dev_ab12cd34"
+function getIdentity() {
+  const name = getName() || "Guest";
+  return `${name}-${getDeviceId()}`;
+}
+
+function renderIdentity() {
+  const nameEl = $("userName");
+  const idEl = $("userId");
+  if (!nameEl || !idEl) return;
+  const name = getName();
+  if (name) {
+    nameEl.textContent = name;
+    idEl.textContent = "-" + getDeviceId();
+  } else {
+    nameEl.textContent = "Guest";
+    idEl.textContent = "-" + getDeviceId();
+  }
+}
+
+// ====== BOOT ======
 document.addEventListener("DOMContentLoaded", () => {
   renderPoints();
+  renderIdentity();
+
   const fileInput = $("fileInput");
   if (fileInput) fileInput.addEventListener("change", onFileSelected);
+
+  if (!getName()) {
+    $("welcomeModal").classList.remove("hidden");
+    setTimeout(() => $("nameInput")?.focus(), 150);
+    $("nameInput")?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") saveName();
+    });
+  }
 });
 
+function saveName() {
+  const input = $("nameInput");
+  const name = (input?.value || "").trim();
+  if (!name) { input?.focus(); return; }
+  setName(name);
+  $("welcomeModal").classList.add("hidden");
+}
+
+// ====== POINTS ======
 function getPoints() {
   return parseInt(localStorage.getItem(POINTS_KEY) || "0", 10);
 }
 function setPoints(v) {
   localStorage.setItem(POINTS_KEY, String(v));
   renderPoints();
-
   const el = document.querySelector(".points");
   if (el) {
     el.classList.add("bump");
@@ -57,7 +103,7 @@ async function ensureModel() {
   maxPredictions = model.getTotalClasses();
 }
 
-// ====== UPLOAD TRIGGER ======
+// ====== UPLOAD ======
 function triggerUpload() {
   const fileInput = $("fileInput");
   fileInput.value = "";
@@ -79,10 +125,8 @@ function onFileSelected(e) {
 async function classifyPreview() {
   try {
     await ensureModel();
-
     const img = $("previewImg");
     if (!img.complete) await new Promise((r) => (img.onload = r));
-
     await handleImage(img, img.src);
   } catch (err) {
     console.error(err);
@@ -127,7 +171,6 @@ async function handleImage(inputEl, dataUrl) {
 
   switchState("stateResult");
 
-  // Animate bars after they render
   requestAnimationFrame(() => {
     document.querySelectorAll(".score-fill").forEach((el) => {
       el.style.width = el.dataset.pct + "%";
@@ -140,13 +183,18 @@ async function handleImage(inputEl, dataUrl) {
 
 // ====== CLOUDINARY ======
 async function uploadToCloudinary(dataUrl, label, confidence) {
+  const name = getName() || "Guest";
+  const deviceId = getDeviceId();
+  const identity = getIdentity(); // "Aarav-dev_ab12cd34"
+
   const form = new FormData();
   form.append("file", dataUrl);
   form.append("upload_preset", UPLOAD_PRESET);
   form.append("folder", CLOUD_FOLDER);
-  form.append("tags", `greenbank,${label.replace(/\s+/g, "_")},conf_${confidence}`);
+  // identity is the human-visible tag; name + device_id kept separate too
+  form.append("tags", `greenbank,${identity},${label.replace(/\s+/g, "_")},conf_${confidence}`);
   form.append("context",
-    `label=${label}|confidence=${confidence}|device_id=${getDeviceId()}`);
+    `identity=${encodeURIComponent(identity)}|name=${encodeURIComponent(name)}|device_id=${deviceId}|label=${label}|confidence=${confidence}`);
 
   const res = await fetch(
     `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
@@ -173,8 +221,6 @@ function resetApp() {
 function toggleReview() {
   $("reviewPop").classList.toggle("open");
 }
-
-// Close popup when clicking elsewhere
 document.addEventListener("click", (e) => {
   const pop = $("reviewPop");
   const btn = $("reviewBtn");
