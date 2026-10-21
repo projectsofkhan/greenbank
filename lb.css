@@ -27,7 +27,6 @@ html, body {
 }
 body.modal-open { overflow: hidden; }
 
-/* ---------- Topbar ---------- */
 .topbar {
   display: flex;
   align-items: center;
@@ -57,13 +56,7 @@ body.modal-open { overflow: hidden; }
   0%, 100% { box-shadow: 0 0 0 4px var(--green-100); }
   50%      { box-shadow: 0 0 0 7px rgba(34,160,107,0.15); }
 }
-
-.topbar-right {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-}
+.topbar-right { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .desktop-nav { display: flex; gap: 4px; margin-right: 8px; }
 .nav-link {
   padding: 8px 14px;
@@ -76,7 +69,6 @@ body.modal-open { overflow: hidden; }
 }
 .nav-link:hover { color: var(--ink); background: var(--green-100); }
 .nav-link.active { color: var(--green-700); background: var(--green-100); }
-
 .user-chip {
   display: inline-flex;
   align-items: center;
@@ -115,7 +107,6 @@ body.modal-open { overflow: hidden; }
 .points-label { font-size: 0.8rem; color: var(--muted); }
 .points-value { font-weight: 600; font-variant-numeric: tabular-nums; }
 
-/* ---------- Leaderboard page ---------- */
 #pageLeaderboard {
   max-width: 720px;
   margin: 0 auto;
@@ -188,7 +179,6 @@ body.modal-open { overflow: hidden; }
   flex-shrink: 0;
 }
 
-/* ---------- Your rank card ---------- */
 .lb-mine {
   margin-top: 20px;
   padding-top: 20px;
@@ -210,7 +200,6 @@ body.modal-open { overflow: hidden; }
 }
 .hidden { display: none !important; }
 
-/* ---------- Footer ---------- */
 .footer {
   max-width: 1200px;
   margin: 0 auto;
@@ -226,7 +215,6 @@ body.modal-open { overflow: hidden; }
   gap: 6px;
   text-align: center;
 }
-
 .info-icon {
   display: inline-flex;
   align-items: center;
@@ -245,12 +233,8 @@ body.modal-open { overflow: hidden; }
   transition: background 0.2s, transform 0.2s;
   touch-action: manipulation;
 }
-.info-icon:hover, .info-icon:active {
-  background: var(--green-300);
-  transform: scale(1.1);
-}
+.info-icon:hover, .info-icon:active { background: var(--green-300); transform: scale(1.1); }
 
-/* ---------- Modal ---------- */
 .modal-backdrop {
   position: fixed;
   inset: 0;
@@ -265,12 +249,7 @@ body.modal-open { overflow: hidden; }
   animation: fadeIn 0.25s ease;
 }
 .modal-backdrop.hidden { display: none; }
-
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
-
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 .modal {
   background: var(--white);
   border-radius: 20px;
@@ -297,10 +276,8 @@ body.modal-open { overflow: hidden; }
 }
 .modal-close {
   position: absolute;
-  top: 14px;
-  right: 14px;
-  width: 36px;
-  height: 36px;
+  top: 14px; right: 14px;
+  width: 36px; height: 36px;
   border-radius: 50%;
   border: none;
   background: var(--bg);
@@ -312,19 +289,9 @@ body.modal-open { overflow: hidden; }
   transition: background 0.2s, color 0.2s, transform 0.2s;
   touch-action: manipulation;
 }
-.modal-close:hover {
-  background: var(--green-100);
-  color: var(--green-700);
-  transform: scale(1.05);
-}
-.modal-info-text {
-  font-size: 0.9rem;
-  color: var(--muted);
-  line-height: 1.55;
-  text-align: left;
-}
+.modal-close:hover { background: var(--green-100); color: var(--green-700); transform: scale(1.05); }
+.modal-info-text { font-size: 0.9rem; color: var(--muted); line-height: 1.55; text-align: left; }
 
-/* ---------- Bottom nav ---------- */
 .bottom-nav {
   display: none;
   position: fixed;
@@ -353,7 +320,6 @@ body.modal-open { overflow: hidden; }
 }
 .bn-item.active { color: var(--green-700); }
 
-/* ---------- Mobile ---------- */
 @media (max-width: 860px) {
   .topbar { padding: 14px 16px; gap: 8px; }
   .brand { font-size: 0.95rem; }
