@@ -16,9 +16,15 @@
       <span class="brand-dot"></span>
       Green Bank
     </div>
-    <div class="points">
-      <span class="points-label">Points</span>
-      <span class="points-value" id="pointsValue">0</span>
+    <div class="topbar-right">
+      <div class="user-chip" id="userChip" title="Your identity on this device">
+        <span class="user-name" id="userName">Guest</span>
+        <span class="user-id" id="userId">· —</span>
+      </div>
+      <div class="points">
+        <span class="points-label">Points</span>
+        <span class="points-value" id="pointsValue">0</span>
+      </div>
     </div>
   </header>
 
@@ -108,6 +114,19 @@
       Results are automated and may be incorrect. Our team will check each submission manually to confirm your points.
     </div>
   </footer>
+
+  <!-- Welcome modal (first visit only) -->
+  <div class="modal-backdrop hidden" id="welcomeModal">
+    <div class="modal">
+      <h2>Welcome to Green Bank 🌱</h2>
+      <p class="muted">Tell us your name so our team can credit the right person.</p>
+      <input type="text" id="nameInput" placeholder="Your name" maxlength="24" autocomplete="off" />
+      <div class="modal-actions">
+        <button class="btn primary" onclick="saveName()">Continue</button>
+      </div>
+      <p class="modal-hint">No account, no password. Stored only on this device.</p>
+    </div>
+  </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
