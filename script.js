@@ -3,14 +3,6 @@ const MODEL_URL = "./";
 const DEVICE_KEY = "greenbank.device";
 const NAME_KEY   = "greenbank.name";
 
-// Point mapping — case-insensitive substring match
-const WASTE_RULES = [
-  { match: /waste|trash|rubbish|garbage|recycl|plastic|glass|metal|paper|cardboard/i, points: +100 },
-];
-const GOOD_RULES = [
-  { match: /good|reusable|clean|organic|compost|material/i, points: -500 },
-];
-
 const CLOUD_NAME    = "fc5nj83m";
 const UPLOAD_PRESET = "ml_default";
 const CLOUD_FOLDER  = "greenbank";
@@ -22,17 +14,31 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let model = null;
 let maxPredictions = 0;
-let inFlight = null;              // single-flight lock
+let inFlight = null;
 const $ = (id) => document.getElementById(id);
 
 const IS_HOME = !!document.getElementById("pageHome");
 const IS_LB   = !!document.getElementById("pageLeaderboard");
 
 // ====== LABEL → POINTS ======
+// Robust: matches against the label string, case-insensitive.
+// Order matters: "good" wins over "waste" if both appear.
+const POINT_RULES = [
+  { match: /\bgood\b|\breusable\b|\bclean\b|\borganic\b|\bcompost\b/i, points: -500 },
+  { match: /\bwaste\b|\btrash\b|\brubbish\b|\bgarbage\b|\brecycl/i,     points: +100 },
+  { match: /\bplastic\b|\bglass\b|\bmetal\b|\bpaper\b|\bcardboard\b/i, points: +100 },
+];
+
 function pointsForLabel(label) {
   const clean = String(label || "").trim();
-  for (const rule of WASTE_RULES) if (rule.match.test(clean)) return rule.points;
-  for (const rule of GOOD_RULES)  if (rule.match.test(clean)) return rule.points;
+  if (!clean) return 0;
+  for (const rule of POINT_RULES) {
+    if (rule.match.test(clean)) {
+      console.log(`[points] "${clean}" matched ${rule.match} → ${rule.points}`);
+      return rule.points;
+    }
+  }
+  console.warn(`[points] "${clean}" did NOT match any rule → 0`);
   return 0;
 }
 
@@ -92,6 +98,12 @@ async function refreshPoints() {
   if (total !== null) renderPoints(total);
   return total ?? 0;
 }
+function applyPointsLocally(delta) {
+  const el = $("pointsValue"); if (!el) return;
+  const current = parseInt(el.textContent.replace("+", ""), 10) || 0;
+  renderPoints(current + delta);
+  bumpChip();
+}
 function bumpChip() {
   const chip = document.querySelector(".points");
   if (!chip) return;
@@ -102,7 +114,6 @@ function bumpChip() {
 // ====== BOOT ======
 document.addEventListener("DOMContentLoaded", async () => {
   renderIdentity();
-
   $("footerInfo")?.addEventListener("click", openReview);
 
   if (IS_HOME) {
@@ -117,7 +128,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       });
     }
 
-    // Render after fetch — no 0-flash
     const total = await fetchMyTotal();
     if (total !== null) renderPoints(total);
   }
@@ -165,7 +175,7 @@ function closeModal(id) {
 function openReview() { openModal("reviewModal"); }
 function closeReview() { closeModal("reviewModal"); }
 
-// ====== MODEL (lazy, cached) ======
+// ====== MODEL ======
 async function ensureModel() {
   if (model) return model;
   model = await tmImage.load(MODEL_URL + "model.json", MODEL_URL + "metadata.json");
@@ -173,43 +183,27 @@ async function ensureModel() {
   return model;
 }
 
-// ====== UPLOAD (safe fallback) ======
+// ====== UPLOAD ======
 function triggerUpload() {
   const fileInput = $("fileInput");
   const cameraInput = $("cameraInput");
   if (!fileInput || !cameraInput) return;
-
-  // Reset both so same-file pick still triggers change
   fileInput.value = "";
   cameraInput.value = "";
 
-  // Try the gallery input first (native sheet includes Camera on most phones)
-  const tryOpen = (input) => {
-    if (typeof input.showPicker === "function") {
-      try { input.showPicker(); return true; }
-      catch (_) { /* fall through */ }
-    }
-    input.click();
-    return true;
-  };
-
-  tryOpen(fileInput);
+  if (typeof fileInput.showPicker === "function") {
+    try { fileInput.showPicker(); return; } catch (_) {}
+  }
+  fileInput.click();
 }
 
-// ====== FILE HANDLING (safe against reuse) ======
 function onFileSelected(e) {
   const file = e.target.files?.[0];
   if (!file) return;
-
-  // Guard: reject if something is already in flight
-  if (inFlight) {
-    console.warn("[upload] busy — ignoring new file");
-    return;
-  }
+  if (inFlight) { console.warn("[upload] busy — ignoring"); return; }
 
   const reader = new FileReader();
   reader.onload = async () => {
-    // Clear inputs AFTER read succeeds
     const fi = $("fileInput"); if (fi) fi.value = "";
     const ci = $("cameraInput"); if (ci) ci.value = "";
 
@@ -235,7 +229,7 @@ function onFileSelected(e) {
   reader.readAsDataURL(file);
 }
 
-// ====== ANALYZE (single-flight) ======
+// ====== ANALYZE ======
 async function classifyPreview() {
   if (inFlight) return inFlight;
 
@@ -289,7 +283,8 @@ async function handleImage(inputEl, dataUrl) {
   const sorted = [...predictions].sort((a, b) => b.probability - a.probability);
   const top = sorted[0];
 
-  // Render scores
+  console.log("[classify] top class:", JSON.stringify(top.className), "| confidence:", top.probability);
+
   const scoresEl = $("scores");
   if (scoresEl) {
     scoresEl.innerHTML = "";
@@ -311,13 +306,20 @@ async function handleImage(inputEl, dataUrl) {
   if (verdictEl) verdictEl.textContent = `Classified as: ${top.className}`;
 
   const delta = pointsForLabel(top.className);
+
   const deltaEl = $("deltaText");
   if (deltaEl) {
-    deltaEl.textContent = delta > 0 ? `+${delta} points` : `${delta} points`;
-    deltaEl.classList.toggle("negative", delta < 0);
+    if (delta === 0) {
+      deltaEl.textContent = `⚠ Unrecognised label — no points.`;
+      deltaEl.classList.add("negative");
+    } else {
+      deltaEl.textContent = delta > 0 ? `+${delta} points` : `${delta} points`;
+      deltaEl.classList.toggle("negative", delta < 0);
+    }
   }
 
-  // Animate can
+  if (delta !== 0) applyPointsLocally(delta);
+
   const door = $("canDoor");
   door?.classList.add("open");
   setTimeout(() => door?.classList.remove("open"), 900);
@@ -332,33 +334,27 @@ async function handleImage(inputEl, dataUrl) {
 
   const confidence = Math.round(top.probability * 100);
 
-  // 1. Cloudinary
+  // Cloudinary (non-blocking)
   let imageUrl = null;
   try {
     imageUrl = await uploadToCloudinary(dataUrl, top.className, confidence);
+    console.log("[cloudinary] uploaded:", imageUrl);
   } catch (e) {
-    console.warn("[cloudinary] failed", e);
+    console.warn("[cloudinary] failed:", e);
     const note = document.querySelector(".review-note");
-    if (note) note.textContent = "⚠ Upload failed — points not applied. Please try again.";
-    return;
+    if (note) note.textContent = "⚠ Image upload failed, but your points were recorded.";
   }
 
-  // 2. Supabase
+  // Save to Supabase
   const saved = await saveSubmission({
     label: top.className,
     confidence,
     points: delta,
     image_url: imageUrl,
   });
+  console.log("[submission] saved:", saved);
 
-  if (!saved) {
-    console.warn("[supabase] submission not saved, but image is safe:", imageUrl);
-    return;
-  }
-
-  // 3. Refresh points from backend (source of truth)
-  await refreshPoints();
-  bumpChip();
+  if (saved) await refreshPoints();
 }
 
 // ====== CLOUDINARY ======
