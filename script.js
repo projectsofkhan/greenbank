@@ -18,7 +18,6 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 let model, maxPredictions, isBusy = false;
 const $ = (id) => document.getElementById(id);
 
-// Detect which page we're on
 const IS_HOME = !!document.getElementById("pageHome");
 const IS_LB   = !!document.getElementById("pageLeaderboard");
 
@@ -33,8 +32,21 @@ function getDeviceId() {
   return id;
 }
 function getName() { return localStorage.getItem(NAME_KEY) || ""; }
-function setName(n) { localStorage.setItem(NAME_KEY, n); renderIdentity(); }
 function getIdentity() { return `${getName() || "Guest"}-${getDeviceId()}`; }
+
+async function setName(name) {
+  localStorage.setItem(NAME_KEY, name);
+  renderIdentity();
+  // Persist to Supabase immediately so it shows up in dashboard
+  try {
+    await sb.from("users").upsert({
+      device_id: getDeviceId(),
+      name,
+    }, { onConflict: "device_id" });
+  } catch (e) {
+    console.warn("User save failed:", e);
+  }
+}
 
 function renderIdentity() {
   const nameEl = $("userName"), idEl = $("userId");
@@ -48,34 +60,65 @@ document.addEventListener("DOMContentLoaded", () => {
   renderPoints();
   renderIdentity();
 
-  // Home-only bindings
   if (IS_HOME) {
     const fileInput = $("fileInput");
     if (fileInput) fileInput.addEventListener("change", onFileSelected);
 
-    // Show name modal on first visit
+    // Footer info
+    $("footerInfo")?.addEventListener("click", openReview);
+
+    // Welcome modal on first visit
     if (!getName()) {
-      $("welcomeModal").classList.remove("hidden");
-      setTimeout(() => $("nameInput")?.focus(), 150);
+      openModal("welcomeModal");
+      setTimeout(() => $("nameInput")?.focus(), 200);
       $("nameInput")?.addEventListener("keydown", (e) => {
         if (e.key === "Enter") saveName();
       });
     }
   }
 
-  // Leaderboard-only binding
-  if (IS_LB) {
-    loadLeaderboard();
-  }
+  if (IS_LB) loadLeaderboard();
+
+  // Backdrop click closes modals
+  document.querySelectorAll(".modal-backdrop").forEach((bd) => {
+    bd.addEventListener("click", (e) => {
+      if (e.target === bd) closeModal(bd.id);
+    });
+  });
+
+  // Escape key
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      document.querySelectorAll(".modal-backdrop:not(.hidden)").forEach((bd) => closeModal(bd.id));
+    }
+  });
 });
 
-function saveName() {
+async function saveName() {
   const input = $("nameInput");
   const name = (input?.value || "").trim();
   if (!name) { input?.focus(); return; }
-  setName(name);
-  $("welcomeModal").classList.add("hidden");
+  await setName(name);
+  closeModal("welcomeModal");
 }
+
+// ====== MODALS ======
+function openModal(id) {
+  const el = $(id);
+  if (!el) return;
+  el.classList.remove("hidden");
+  document.body.classList.add("modal-open");
+}
+function closeModal(id) {
+  const el = $(id);
+  if (!el) return;
+  el.classList.add("hidden");
+  if (!document.querySelector(".modal-backdrop:not(.hidden)")) {
+    document.body.classList.remove("modal-open");
+  }
+}
+function openReview() { openModal("reviewModal"); }
+function closeReview() { closeModal("reviewModal"); }
 
 // ====== POINTS ======
 function getPoints() { return parseInt(localStorage.getItem(POINTS_KEY) || "0", 10); }
@@ -99,7 +142,7 @@ async function ensureModel() {
   maxPredictions = model.getTotalClasses();
 }
 
-// ====== UPLOAD TRIGGER ======
+// ====== UPLOAD ======
 function triggerUpload() {
   const fileInput = $("fileInput");
   if (!fileInput) return;
@@ -117,7 +160,7 @@ function onFileSelected(e) {
   reader.readAsDataURL(file);
 }
 
-// ====== ANALYZE with wave animation ======
+// ====== ANALYZE ======
 async function classifyPreview() {
   if (isBusy) return;
   isBusy = true;
@@ -203,12 +246,7 @@ async function handleImage(inputEl, dataUrl) {
   const imageUrl = await uploadToCloudinary(dataUrl, top.className, confidence)
     .catch((e) => { console.warn("Cloudinary upload failed:", e); return null; });
 
-  saveSubmission({
-    label: top.className,
-    confidence,
-    points: delta,
-    image_url: imageUrl,
-  });
+  saveSubmission({ label: top.className, confidence, points: delta, image_url: imageUrl });
 }
 
 // ====== CLOUDINARY ======
@@ -240,14 +278,12 @@ async function saveSubmission({ label, confidence, points, image_url }) {
     identity: getIdentity(),
     name: getName() || "Guest",
     device_id: getDeviceId(),
-    label,
-    confidence,
-    points,
-    image_url,
+    label, confidence, points, image_url,
   });
   if (error) console.warn("Supabase insert failed:", error);
 }
 
+// ====== LEADERBOARD ======
 async function loadLeaderboard() {
   const list = $("lbList");
   if (!list) return;
@@ -269,18 +305,34 @@ async function loadLeaderboard() {
   }
 
   list.innerHTML = "";
+  const myDeviceId = getDeviceId();
+  let myRank = -1, myRow = null;
+
   data.forEach((row, i) => {
+    const isMe = row.identity?.endsWith(myDeviceId);
+    if (isMe) { myRank = i + 1; myRow = row; }
+
     const el = document.createElement("div");
     el.className = "lb-row";
     el.style.animationDelay = `${i * 40}ms`;
     el.innerHTML = `
       <span class="lb-rank">${i + 1}</span>
-      <span class="lb-name">${escapeHtml(row.name)}</span>
+      <span class="lb-name">${escapeHtml(row.name)}${isMe ? ' <span style="color:var(--green-700);font-size:0.75rem;">(you)</span>' : ""}</span>
       <span class="lb-pts">${row.total_points > 0 ? "+" : ""}${row.total_points}</span>
       <span class="lb-subs">${row.submissions} scans</span>
     `;
     list.appendChild(el);
   });
+
+  // Your rank card at bottom
+  const mineBox = $("lbMine");
+  if (mineBox && myRow) {
+    mineBox.classList.remove("hidden");
+    $("myRank").textContent = myRank;
+    $("myName").textContent = myRow.name;
+    $("myPts").textContent = (myRow.total_points > 0 ? "+" : "") + myRow.total_points;
+    $("mySubs").textContent = myRow.submissions + " scans";
+  }
 }
 
 function escapeHtml(s) {
@@ -294,8 +346,7 @@ function switchState(id) {
     const el = $(s);
     if (el) el.classList.add("hidden");
   });
-  const target = $(id);
-  if (target) target.classList.remove("hidden");
+  $(id)?.classList.remove("hidden");
 }
 function resetApp() {
   const img = $("previewImg");
@@ -303,14 +354,10 @@ function resetApp() {
   switchState("stateIdle");
 }
 
-// ====== INFO POPUP ======
-function toggleReview() {
-  $("reviewPop")?.classList.toggle("open");
-}
-document.addEventListener("click", (e) => {
-  const pop = $("reviewPop"), btn = $("reviewBtn");
-  if (!pop || !btn) return;
-  if (!pop.contains(e.target) && !btn.contains(e.target)) {
-    pop.classList.remove("open");
-  }
-});
+// Expose for inline onclick
+window.triggerUpload = triggerUpload;
+window.classifyPreview = classifyPreview;
+window.resetApp = resetApp;
+window.saveName = saveName;
+window.openReview = openReview;
+window.closeReview = closeReview;
