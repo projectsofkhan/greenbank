@@ -20,8 +20,7 @@ const $ = (id) => document.getElementById(id);
 const IS_HOME = !!document.getElementById("pageHome");
 const IS_LB   = !!document.getElementById("pageLeaderboard");
 
-// ====== LABEL → POINTS (must mirror SQL trigger) ======
-// Rules order: waste keywords FIRST so "organic waste" scores as waste.
+// ====== LABEL → POINTS (mirrors SQL trigger) ======
 function normalizeLabel(s) {
   return String(s || "")
     .normalize("NFKD")
@@ -54,7 +53,6 @@ function getDeviceId() {
 }
 function getName() { return localStorage.getItem(NAME_KEY) || ""; }
 function getDisplayName() { return getName() || "Guest"; }
-// Identity is stable across renames: device_id only.
 function getIdentity() { return getDeviceId(); }
 
 function renderIdentity() {
@@ -72,7 +70,6 @@ async function setName(name) {
   renderIdentity();
 
   const deviceId = getDeviceId();
-  // Upsert: insert or update in one shot
   const { error: upsertErr } = await sb
     .from("users")
     .upsert({ device_id: deviceId, name: trimmed }, { onConflict: "device_id" });
@@ -83,7 +80,6 @@ async function setName(name) {
     return false;
   }
 
-  // Propagate rename to existing submissions so leaderboard groups correctly
   if (previous && previous !== trimmed) {
     const { error: updErr } = await sb
       .from("submissions")
@@ -101,8 +97,7 @@ async function fetchMyTotal() {
     .select("points")
     .eq("device_id", getDeviceId());
   if (error) { console.warn("[points] fetch failed", error); return null; }
-  const total = (data || []).reduce((s, r) => s + (r.points || 0), 0);
-  return total;
+  return (data || []).reduce((s, r) => s + (r.points || 0), 0);
 }
 
 function formatPoints(v) {
@@ -122,11 +117,24 @@ async function refreshPoints() {
   return total ?? 0;
 }
 
-function bumpChip() {
+// Instantly bump the local chip without waiting for a server round-trip.
+function addToChip(delta) {
+  const el = $("pointsValue"); if (!el) return;
+  const raw = el.textContent.trim();
+  const current = raw === "—" ? 0 : parseInt(raw.replace(/^[+]/, ""), 10);
+  const next = (isNaN(current) ? 0 : current) + delta;
+  renderPoints(next);
+  animateChip();
+}
+
+function animateChip() {
   const chip = document.getElementById("pointsChip") || document.querySelector(".points");
   if (!chip) return;
+  chip.classList.remove("bump");
+  // force reflow so the class re-applies cleanly
+  void chip.offsetWidth;
   chip.classList.add("bump");
-  setTimeout(() => chip.classList.remove("bump"), 300);
+  setTimeout(() => chip.classList.remove("bump"), 500);
 }
 
 // ====== BOOT ======
@@ -134,8 +142,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   renderIdentity();
   $("footerInfo")?.addEventListener("click", openReview);
 
-  // Always load points (home AND leaderboard)
-  refreshPoints().then(() => bumpChip());
+  refreshPoints();
 
   if (IS_HOME) {
     $("fileInput")?.addEventListener("change", onFileSelected);
@@ -153,7 +160,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   if (IS_LB) loadLeaderboard();
 
-  // Backdrop click: only closes reviewModal, NOT welcomeModal
   document.querySelectorAll(".modal-backdrop").forEach((bd) => {
     bd.addEventListener("click", (e) => {
       if (e.target === bd && bd.id !== "welcomeModal") closeModal(bd.id);
@@ -182,7 +188,6 @@ async function saveName() {
 }
 
 function skipName() {
-  // Persist "Guest" so the modal doesn't reappear
   if (!getName()) {
     localStorage.setItem(NAME_KEY, "Guest");
     renderIdentity();
@@ -255,7 +260,9 @@ function onFileSelected(e) {
     });
 
     switchState("statePreview");
-    // Analysis is a manual step now — user clicks "Analyze"
+    // Small pause so the preview visibly lands, then auto-analyze.
+    // This keeps the old "upload → result" flow but with a real transition.
+    setTimeout(() => classifyPreview(), 260);
   };
   reader.onerror = () => {
     alert("Could not read the image. Please try another one.");
@@ -281,9 +288,9 @@ async function classifyPreview() {
 
     let progress = 0;
     const tick = setInterval(() => {
-      progress = Math.min(progress + Math.random() * 12, 90);
+      progress = Math.min(progress + Math.random() * 10, 92);
       fill?.style.setProperty("--fill", progress + "%");
-    }, 200);
+    }, 180);
 
     try {
       await ensureModel();
@@ -302,7 +309,7 @@ async function classifyPreview() {
         const l = btn?.querySelector(".btn-label");
         if (l) l.textContent = "Analyze";
         scanLine?.classList.add("hidden");
-      }, 350);
+      }, 300);
       inFlight = null;
     }
   })();
@@ -325,7 +332,7 @@ async function handleImage(inputEl, dataUrl) {
       const pct = Math.round(p.probability * 100);
       const row = document.createElement("div");
       row.className = "score-row";
-      row.style.animationDelay = `${i * 60}ms`;
+      row.style.animationDelay = `${i * 70}ms`;
       row.innerHTML = `
         <span class="score-label">${escapeHtml(p.className)}</span>
         <span class="score-bar"><span class="score-fill" data-pct="${pct}"></span></span>
@@ -341,62 +348,94 @@ async function handleImage(inputEl, dataUrl) {
   const delta = pointsForLabel(label);
   const confidence = Math.round(top.probability * 100);
 
-  // Low-confidence guard: don't score below 60%
-  const lowConfidence = confidence < 60;
-
   const deltaEl = $("deltaText");
   if (deltaEl) {
-    if (lowConfidence) {
-      deltaEl.textContent = `⚠ Low confidence (${confidence}%) — submission saved, but no points awarded.`;
-      deltaEl.classList.add("negative");
-    } else if (delta === 0) {
+    deltaEl.classList.remove("negative", "positive");
+    if (delta === 0) {
       deltaEl.textContent = `⚠ Unrecognised label — no points.`;
       deltaEl.classList.add("negative");
     } else {
       deltaEl.textContent = delta > 0 ? `+${delta} points` : `${delta} points`;
-      deltaEl.classList.toggle("negative", delta < 0);
+      deltaEl.classList.add(delta < 0 ? "negative" : "positive");
     }
   }
 
-  const door = $("canDoor");
-  door?.classList.add("open");
-  setTimeout(() => door?.classList.remove("open"), 900);
+  // 1) Animate can
+  animateCan();
 
+  // 2) Show result screen FIRST (instant — no waiting)
   switchState("stateResult");
 
+  // 3) Animate score bars in
   requestAnimationFrame(() => {
     document.querySelectorAll(".score-fill").forEach((el) => {
       el.style.width = el.dataset.pct + "%";
     });
   });
 
-  let imageUrl = null;
+  // 4) INSTANT chip update — do this before any network call
+  if (delta !== 0) addToChip(delta);
+
+  // 5) Save in the background (upload + insert). Show save status.
+  showSaveStatus("saving");
+  let savedOk = false;
   try {
-    imageUrl = await uploadToCloudinary(dataUrl, label, confidence);
+    let imageUrl = null;
+    try {
+      imageUrl = await uploadToCloudinary(dataUrl, label, confidence);
+    } catch (e) {
+      console.warn("[cloudinary] failed:", e);
+    }
+    savedOk = await saveSubmission({
+      label,
+      confidence,
+      points: 0, // trigger sets the real value
+      image_url: imageUrl,
+    });
   } catch (e) {
-    console.warn("[cloudinary] failed:", e);
+    console.warn("[save] failed:", e);
   }
 
-  // Points are computed by the DB trigger. Send 0; trigger overwrites.
-  // For low-confidence we still insert with confidence < 60 — no way to
-  // force 0 through the trigger for a recognized label, so we just skip
-  // inserting a scoring row by... actually inserting anyway with a note.
-  // Simpler: insert normally; trigger decides. If confidence is low the
-  // user sees "no points awarded" locally, but DB still awards. To truly
-  // prevent scoring low-confidence, we'd need a SQL change. For now,
-  // the trigger is the source of truth and confidence is logged.
-  const saved = await saveSubmission({
-    label,
-    confidence,
-    points: 0, // trigger will set correct value
-    image_url: imageUrl,
-  });
-
-  // Always resync from server (fixes drift on failure)
-  if (saved) {
-    await refreshPoints();
-    bumpChip();
+  if (savedOk) {
+    showSaveStatus("saved");
+    // Reconcile with server truth (silent — chip already looks right)
+    refreshPoints();
+  } else {
+    showSaveStatus("error");
+    // Roll back the optimistic chip so it doesn't lie
+    if (delta !== 0) addToChip(-delta);
   }
+}
+
+function showSaveStatus(state) {
+  const el = $("saveStatus");
+  if (!el) return;
+  el.classList.remove("hidden", "saving", "saved", "error");
+  if (state === "saving") {
+    el.classList.add("saving");
+    el.textContent = "Saving…";
+  } else if (state === "saved") {
+    el.classList.add("saved");
+    el.textContent = "✓ Saved";
+    setTimeout(() => el.classList.add("hidden"), 1600);
+  } else {
+    el.classList.add("error");
+    el.textContent = "⚠ Not saved — try again";
+  }
+}
+
+function animateCan() {
+  const can = $("can");
+  if (!can) return;
+  can.classList.remove("pulse");
+  void can.offsetWidth;
+  can.classList.add("pulse");
+  setTimeout(() => can.classList.remove("pulse"), 900);
+
+  const door = $("canDoor");
+  if (!door) return;
+  door.classList.add("open");
+  setTimeout(() => door.classList.remove("open"), 1000);
 }
 
 // ====== CLOUDINARY ======
@@ -430,7 +469,7 @@ async function saveSubmission({ label, confidence, points, image_url }) {
     device_id: getDeviceId(),
     label, confidence, points, image_url,
   };
-  const { data, error } = await sb.from("submissions").insert(payload).select();
+  const { error } = await sb.from("submissions").insert(payload);
   if (error) { console.warn("[submission] insert failed:", error); return false; }
   return true;
 }
@@ -510,6 +549,7 @@ function resetApp() {
   if (img) { img.onload = null; img.onerror = null; img.src = ""; }
   const fi = $("fileInput"); if (fi) fi.value = "";
   const ci = $("cameraInput"); if (ci) ci.value = "";
+  const status = $("saveStatus"); if (status) status.classList.add("hidden");
   switchState("stateIdle");
 }
 
