@@ -15,6 +15,7 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 let model = null;
 let modelPromise = null;
 let inFlight = null;
+let analysisAborted = false;
 const $ = (id) => document.getElementById(id);
 
 const IS_HOME = !!document.getElementById("pageHome");
@@ -117,7 +118,6 @@ async function refreshPoints() {
   return total ?? 0;
 }
 
-// Instantly bump the local chip without waiting for a server round-trip.
 function addToChip(delta) {
   const el = $("pointsValue"); if (!el) return;
   const raw = el.textContent.trim();
@@ -131,7 +131,6 @@ function animateChip() {
   const chip = document.getElementById("pointsChip") || document.querySelector(".points");
   if (!chip) return;
   chip.classList.remove("bump");
-  // force reflow so the class re-applies cleanly
   void chip.offsetWidth;
   chip.classList.add("bump");
   setTimeout(() => chip.classList.remove("bump"), 500);
@@ -259,10 +258,8 @@ function onFileSelected(e) {
       img.onerror = () => resolve();
     });
 
+    // Show preview. Do NOT analyze automatically.
     switchState("statePreview");
-    // Small pause so the preview visibly lands, then auto-analyze.
-    // This keeps the old "upload → result" flow but with a real transition.
-    setTimeout(() => classifyPreview(), 260);
   };
   reader.onerror = () => {
     alert("Could not read the image. Please try another one.");
@@ -272,59 +269,125 @@ function onFileSelected(e) {
   reader.readAsDataURL(file);
 }
 
-// ====== ANALYZE ======
+// ====== ANALYZE — real 0→100% progress ======
 async function classifyPreview() {
   if (inFlight) return inFlight;
+  analysisAborted = false;
+
   inFlight = (async () => {
     const btn = $("analyzeBtn");
     const fill = $("waveFill");
     const scanLine = $("scanLine");
-    if (btn) {
-      btn.classList.add("busy");
-      const l = btn.querySelector(".btn-label");
-      if (l) l.textContent = "Analyzing…";
-    }
-    scanLine?.classList.remove("hidden");
+    const pctEl = $("analyzePct");
+    const labelEl = $("analyzeLabel");
 
+    // Enter busy state
+    if (btn) btn.classList.add("busy");
+    if (labelEl) labelEl.textContent = "Analyzing";
+    if (pctEl) pctEl.textContent = "0%";
+    scanLine?.classList.remove("hidden");
+    fill?.style.setProperty("--fill", "0%");
+
+    // Progress driver: real, monotonic 0 → 100
     let progress = 0;
+    let progressTarget = 0;
     const tick = setInterval(() => {
-      progress = Math.min(progress + Math.random() * 10, 92);
+      if (analysisAborted) return;
+      // creep toward target, but never exceed it
+      progress += Math.max(0.4, (progressTarget - progress) * 0.12);
+      if (progress > progressTarget) progress = progressTarget;
+      if (progress > 99) progress = 99;
       fill?.style.setProperty("--fill", progress + "%");
-    }, 180);
+      if (pctEl) pctEl.textContent = Math.floor(progress) + "%";
+    }, 40);
 
     try {
+      // Phase 1: model load (0 → 20%)
+      progressTarget = 20;
       await ensureModel();
+      if (analysisAborted) throw new Error("aborted");
+
+      // Phase 2: prediction (20 → 70%)
+      progressTarget = 70;
       const img = $("previewImg");
-      if (!img.complete) await new Promise((r) => (img.onload = r));
-      await handleImage(img, img.src);
+      if (!img.complete) {
+        await new Promise((r) => {
+          img.onload = r;
+          img.onerror = r;
+        });
+      }
+      if (analysisAborted) throw new Error("aborted");
+
+      const predictions = await ensureModel().then((m) => m.predict(img));
+      if (analysisAborted) throw new Error("aborted");
+
+      // Phase 3: prepare result (70 → 100%)
+      progressTarget = 100;
+
+      // Snap the progress bar to 100 visibly
+      await animateTo100(fill, pctEl);
+
+      // Small hold so the user sees "100%" before result appears
+      await wait(220);
+
+      if (analysisAborted) throw new Error("aborted");
+
+      // Now reveal the result with smooth animation
+      await revealResult(predictions, img.src);
     } catch (err) {
-      console.error("[analyze] ERROR:", err);
-      alert("Could not analyze this image. Please try again.");
+      if (err.message === "aborted") {
+        console.log("[analyze] cancelled by user");
+      } else {
+        console.error("[analyze] ERROR:", err);
+        alert("Could not analyze this image. Please try again.");
+      }
     } finally {
       clearInterval(tick);
-      fill?.style.setProperty("--fill", "100%");
+      // Reset button to idle state
       setTimeout(() => {
         fill?.style.setProperty("--fill", "0%");
+        if (pctEl) pctEl.textContent = "";
+        if (labelEl) labelEl.textContent = "Analyze";
         btn?.classList.remove("busy");
-        const l = btn?.querySelector(".btn-label");
-        if (l) l.textContent = "Analyze";
         scanLine?.classList.add("hidden");
-      }, 300);
+      }, 400);
       inFlight = null;
     }
   })();
+
   return inFlight;
 }
 
-// ====== PIPELINE ======
-async function handleImage(inputEl, dataUrl) {
-  const model = await ensureModel();
-  const predictions = await model.predict(inputEl);
+function animateTo100(fill, pctEl) {
+  return new Promise((resolve) => {
+    let p = 70;
+    const step = () => {
+      p += 2.5;
+      if (p >= 100) {
+        fill?.style.setProperty("--fill", "100%");
+        if (pctEl) pctEl.textContent = "100%";
+        resolve();
+        return;
+      }
+      fill?.style.setProperty("--fill", p + "%");
+      if (pctEl) pctEl.textContent = Math.floor(p) + "%";
+      setTimeout(step, 30);
+    };
+    step();
+  });
+}
 
+function wait(ms) { return new Promise((r) => setTimeout(r, ms)); }
+
+// ====== RESULT REVEAL ======
+async function revealResult(predictions, dataUrl) {
   const sorted = [...predictions].sort((a, b) => b.probability - a.probability);
   const top = sorted[0];
   const label = String(top.className || "");
+  const confidence = Math.round(top.probability * 100);
+  const delta = pointsForLabel(label);
 
+  // Build scores
   const scoresEl = $("scores");
   if (scoresEl) {
     scoresEl.innerHTML = "";
@@ -332,7 +395,7 @@ async function handleImage(inputEl, dataUrl) {
       const pct = Math.round(p.probability * 100);
       const row = document.createElement("div");
       row.className = "score-row";
-      row.style.animationDelay = `${i * 70}ms`;
+      row.style.animationDelay = `${i * 80}ms`;
       row.innerHTML = `
         <span class="score-label">${escapeHtml(p.className)}</span>
         <span class="score-bar"><span class="score-fill" data-pct="${pct}"></span></span>
@@ -344,9 +407,6 @@ async function handleImage(inputEl, dataUrl) {
 
   const verdictEl = $("verdictText");
   if (verdictEl) verdictEl.textContent = `Classified as: ${label}`;
-
-  const delta = pointsForLabel(label);
-  const confidence = Math.round(top.probability * 100);
 
   const deltaEl = $("deltaText");
   if (deltaEl) {
@@ -360,23 +420,25 @@ async function handleImage(inputEl, dataUrl) {
     }
   }
 
-  // 1) Animate can
+  // Can animation
   animateCan();
 
-  // 2) Show result screen FIRST (instant — no waiting)
+  // Switch to result state — CSS animates the fade-in
   switchState("stateResult");
 
-  // 3) Animate score bars in
+  // Score bars fill after the row mounts
   requestAnimationFrame(() => {
-    document.querySelectorAll(".score-fill").forEach((el) => {
-      el.style.width = el.dataset.pct + "%";
+    requestAnimationFrame(() => {
+      document.querySelectorAll(".score-fill").forEach((el) => {
+        el.style.width = el.dataset.pct + "%";
+      });
     });
   });
 
-  // 4) INSTANT chip update — do this before any network call
+  // Instant chip update
   if (delta !== 0) addToChip(delta);
 
-  // 5) Save in the background (upload + insert). Show save status.
+  // Save in background
   showSaveStatus("saving");
   let savedOk = false;
   try {
@@ -389,7 +451,7 @@ async function handleImage(inputEl, dataUrl) {
     savedOk = await saveSubmission({
       label,
       confidence,
-      points: 0, // trigger sets the real value
+      points: 0,
       image_url: imageUrl,
     });
   } catch (e) {
@@ -398,11 +460,9 @@ async function handleImage(inputEl, dataUrl) {
 
   if (savedOk) {
     showSaveStatus("saved");
-    // Reconcile with server truth (silent — chip already looks right)
     refreshPoints();
   } else {
     showSaveStatus("error");
-    // Roll back the optimistic chip so it doesn't lie
     if (delta !== 0) addToChip(-delta);
   }
 }
@@ -436,6 +496,24 @@ function animateCan() {
   if (!door) return;
   door.classList.add("open");
   setTimeout(() => door.classList.remove("open"), 1000);
+}
+
+// ====== CANCEL ======
+function cancelAnalysis() {
+  if (inFlight) {
+    analysisAborted = true;
+    // Reset UI immediately
+    const fill = $("waveFill");
+    const pctEl = $("analyzePct");
+    const labelEl = $("analyzeLabel");
+    const btn = $("analyzeBtn");
+    fill?.style.setProperty("--fill", "0%");
+    if (pctEl) pctEl.textContent = "";
+    if (labelEl) labelEl.textContent = "Analyze";
+    btn?.classList.remove("busy");
+    $("scanLine")?.classList.add("hidden");
+  }
+  resetApp();
 }
 
 // ====== CLOUDINARY ======
@@ -557,6 +635,7 @@ function resetApp() {
 window.triggerUpload = triggerUpload;
 window.classifyPreview = classifyPreview;
 window.resetApp = resetApp;
+window.cancelAnalysis = cancelAnalysis;
 window.saveName = saveName;
 window.skipName = skipName;
 window.openReview = openReview;
