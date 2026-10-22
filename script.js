@@ -230,10 +230,8 @@ async function ensureModel() {
 function triggerUpload() {
   const fileInput = $("fileInput");
   if (!fileInput) return;
-  fileInput.value = "";
-  if (typeof fileInput.showPicker === "function") {
-    try { fileInput.showPicker(); return; } catch (_) {}
-  }
+  // Removed fileInput.value = "" from here. 
+  // Clearing it right before opening the picker causes mobile browsers to cancel.
   fileInput.click();
 }
 
@@ -244,6 +242,7 @@ function onFileSelected(e) {
 
   const reader = new FileReader();
   reader.onload = async () => {
+    // NOW we clear the inputs safely
     const fi = $("fileInput"); if (fi) fi.value = "";
     const ci = $("cameraInput"); if (ci) ci.value = "";
 
@@ -258,7 +257,6 @@ function onFileSelected(e) {
       img.onerror = () => resolve();
     });
 
-    // Show preview. Do NOT analyze automatically.
     switchState("statePreview");
   };
   reader.onerror = () => {
@@ -269,7 +267,7 @@ function onFileSelected(e) {
   reader.readAsDataURL(file);
 }
 
-// ====== ANALYZE — real 0→100% progress ======
+// ====== ANALYZE ======
 async function classifyPreview() {
   if (inFlight) return inFlight;
   analysisAborted = false;
@@ -281,19 +279,16 @@ async function classifyPreview() {
     const pctEl = $("analyzePct");
     const labelEl = $("analyzeLabel");
 
-    // Enter busy state
     if (btn) btn.classList.add("busy");
     if (labelEl) labelEl.textContent = "Analyzing";
     if (pctEl) pctEl.textContent = "0%";
     scanLine?.classList.remove("hidden");
     fill?.style.setProperty("--fill", "0%");
 
-    // Progress driver: real, monotonic 0 → 100
     let progress = 0;
     let progressTarget = 0;
     const tick = setInterval(() => {
       if (analysisAborted) return;
-      // creep toward target, but never exceed it
       progress += Math.max(0.4, (progressTarget - progress) * 0.12);
       if (progress > progressTarget) progress = progressTarget;
       if (progress > 99) progress = 99;
@@ -302,12 +297,10 @@ async function classifyPreview() {
     }, 40);
 
     try {
-      // Phase 1: model load (0 → 20%)
       progressTarget = 20;
       await ensureModel();
       if (analysisAborted) throw new Error("aborted");
 
-      // Phase 2: prediction (20 → 70%)
       progressTarget = 70;
       const img = $("previewImg");
       if (!img.complete) {
@@ -321,18 +314,12 @@ async function classifyPreview() {
       const predictions = await ensureModel().then((m) => m.predict(img));
       if (analysisAborted) throw new Error("aborted");
 
-      // Phase 3: prepare result (70 → 100%)
       progressTarget = 100;
-
-      // Snap the progress bar to 100 visibly
       await animateTo100(fill, pctEl);
-
-      // Small hold so the user sees "100%" before result appears
       await wait(220);
 
       if (analysisAborted) throw new Error("aborted");
 
-      // Now reveal the result with smooth animation
       await revealResult(predictions, img.src);
     } catch (err) {
       if (err.message === "aborted") {
@@ -343,7 +330,6 @@ async function classifyPreview() {
       }
     } finally {
       clearInterval(tick);
-      // Reset button to idle state
       setTimeout(() => {
         fill?.style.setProperty("--fill", "0%");
         if (pctEl) pctEl.textContent = "";
@@ -387,7 +373,6 @@ async function revealResult(predictions, dataUrl) {
   const confidence = Math.round(top.probability * 100);
   const delta = pointsForLabel(label);
 
-  // Build scores
   const scoresEl = $("scores");
   if (scoresEl) {
     scoresEl.innerHTML = "";
@@ -420,13 +405,9 @@ async function revealResult(predictions, dataUrl) {
     }
   }
 
-  // Can animation
   animateCan();
-
-  // Switch to result state — CSS animates the fade-in
   switchState("stateResult");
 
-  // Score bars fill after the row mounts
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
       document.querySelectorAll(".score-fill").forEach((el) => {
@@ -435,10 +416,8 @@ async function revealResult(predictions, dataUrl) {
     });
   });
 
-  // Instant chip update
   if (delta !== 0) addToChip(delta);
 
-  // Save in background
   showSaveStatus("saving");
   let savedOk = false;
   try {
@@ -502,7 +481,6 @@ function animateCan() {
 function cancelAnalysis() {
   if (inFlight) {
     analysisAborted = true;
-    // Reset UI immediately
     const fill = $("waveFill");
     const pctEl = $("analyzePct");
     const labelEl = $("analyzeLabel");
