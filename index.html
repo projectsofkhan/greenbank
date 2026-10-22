@@ -82,9 +82,12 @@
           <div class="cam-actions">
             <button class="btn primary wave-btn" id="analyzeBtn" onclick="classifyPreview()">
               <span class="wave-fill" id="waveFill"></span>
-              <span class="btn-label">Analyze</span>
+              <span class="btn-label">
+                <span id="analyzeLabel">Analyze</span>
+                <span id="analyzePct"></span>
+              </span>
             </button>
-            <button class="btn ghost" onclick="resetApp()">Cancel</button>
+            <button class="btn ghost" onclick="cancelAnalysis()">Cancel</button>
           </div>
         </div>
 
@@ -166,6 +169,6 @@
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="script.js?v=10"></script>
+  <script src="script.js?v=11"></script>
 </body>
 </html>
