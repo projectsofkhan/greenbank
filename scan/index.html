@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Green Bank · Reward</title>
+  <meta name="robots" content="noindex, nofollow" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="scan.css" />
+</head>
+<body>
+
+  <header class="mark">
+    <div class="mark-dot"></div>
+    <span>GREEN BANK</span>
+  </header>
+
+  <main class="wrap">
+
+    <!-- STATE: loading -->
+    <section class="state" id="stateLoading">
+      <div class="label">VERIFYING</div>
+      <h1>Checking your code…</h1>
+      <div class="loader"></div>
+    </section>
+
+    <!-- STATE: invalid -->
+    <section class="state hidden" id="stateInvalid">
+      <div class="label">LINK</div>
+      <h1>Invalid or expired link.</h1>
+      <p class="sub">This QR code is not recognized. Please contact the station.</p>
+    </section>
+
+    <!-- STATE: used -->
+    <section class="state hidden" id="stateUsed">
+      <div class="label">LINK</div>
+      <h1>This QR has already been used.</h1>
+      <p class="sub">Each QR code is valid for a single scan only.</p>
+      <div class="balance-row">
+        <span class="balance-label">YOUR BALANCE</span>
+        <span class="balance-value" id="usedBalance">0</span>
+      </div>
+    </section>
+
+    <!-- STATE: success -->
+    <section class="state hidden" id="stateSuccess">
+      <div class="label">REWARD</div>
+      <h1 class="big-plus">+100</h1>
+      <p class="sub">Points added to your account.</p>
+
+      <div class="balance-row">
+        <span class="balance-label">YOUR BALANCE</span>
+        <span class="balance-value" id="successBalance">0</span>
+      </div>
+    </section>
+
+    <!-- SHOP (shown in success or used states) -->
+    <section class="shop hidden" id="shopSection">
+      <div class="shop-head">
+        <div class="label">SHOP</div>
+        <h2>Redeem your points</h2>
+        <p class="sub">Physical products are fulfilled by Carmedia.</p>
+      </div>
+
+      <div class="grid">
+
+        <!-- Product 1: Poster -->
+        <article class="card">
+          <div class="card-media">
+            <img src="/img1.png" alt="Poster" onerror="this.parentElement.classList.add('ph'); this.remove();" />
+            <div class="ph-text">POSTER</div>
+          </div>
+          <div class="card-body">
+            <div class="card-name">Poster</div>
+            <div class="card-price">1,000 <span>pts</span></div>
+            <div class="card-actions">
+              <button class="btn solid" onclick="attemptPurchase('Poster', 1000)">Purchase</button>
+              <button class="btn ghost" onclick="openInfo('Poster', 1000)" aria-label="More info">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+                  <circle cx="12" cy="12" r="10"/>
+                  <line x1="12" y1="16" x2="12" y2="12"/>
+                  <line x1="12" y1="8" x2="12.01" y2="8"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </article>
+
+        <!-- Product 2: 2 Posters -->
+        <article class="card">
+          <div class="card-media">
+            <img src="/img2.png" alt="2 Posters" onerror="this.parentElement.classList.add('ph'); this.remove();" />
+            <div class="ph-text">2 POSTERS</div>
+          </div>
+          <div class="card-body">
+            <div class="card-name">2 Posters</div>
+            <div class="card-price">1,600 <span>pts</span></div>
+            <div class="card-actions">
+              <button class="btn solid" onclick="attemptPurchase('2 Posters', 1600)">Purchase</button>
+              <button class="btn ghost" onclick="openInfo('2 Posters', 1600)" aria-label="More info">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+                  <circle cx="12" cy="12" r="10"/>
+                  <line x1="12" y1="16" x2="12" y2="12"/>
+                  <line x1="12" y1="8" x2="12.01" y2="8"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </article>
+
+        <!-- Product 3: Frame -->
+        <article class="card">
+          <div class="card-media">
+            <img src="/img3.png" alt="Frame" onerror="this.parentElement.classList.add('ph'); this.remove();" />
+            <div class="ph-text">FRAME</div>
+          </div>
+          <div class="card-body">
+            <div class="card-name">Frame</div>
+            <div class="card-price">3,000 <span>pts</span></div>
+            <div class="card-actions">
+              <button class="btn solid" onclick="attemptPurchase('Frame', 3000)">Purchase</button>
+              <button class="btn ghost" onclick="openInfo('Frame', 3000)" aria-label="More info">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+                  <circle cx="12" cy="12" r="10"/>
+                  <line x1="12" y1="16" x2="12" y2="12"/>
+                  <line x1="12" y1="8" x2="12.01" y2="8"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </article>
+
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="foot">
+    <span>REWARDS FULFILLED BY <a href="https://instagram.com/carmedia.in" target="_blank" rel="noopener noreferrer">@CARmedia.in</a></span>
+  </footer>
+
+  <!-- INFO / PURCHASE MODAL -->
+  <div class="modal-back hidden" id="modalBack">
+    <div class="modal">
+      <div class="modal-top">
+        <div class="label" id="modalLabel">INFO</div>
+        <button class="modal-close" onclick="closeModal()" aria-label="Close">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Info variant -->
+      <div id="modalInfo">
+        <h3 id="infoTitle">Poster</h3>
+        <p class="modal-text" id="infoText"></p>
+        <p class="modal-note">Delivery usually takes 4–9 days.</p>
+        <a class="btn solid insta" href="https://instagram.com/carmedia.in" target="_blank" rel="noopener noreferrer">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <rect x="3" y="3" width="18" height="18" rx="5"/>
+            <circle cx="12" cy="12" r="4"/>
+            <circle cx="17.5" cy="6.5" r="0.5" fill="currentColor"/>
+          </svg>
+          @carmedia.in
+        </a>
+      </div>
+
+      <!-- Not enough points variant -->
+      <div id="modalInsufficient" class="hidden">
+        <h3>Not enough points</h3>
+        <p class="modal-text">You don't have enough points to purchase this product.</p>
+        <p class="modal-note">Scan more QR codes from the dustbins to earn points.</p>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    // ====== CONFIG ======
+    const SUPABASE_URL      = "https://hfevedbqkjgwycdtranm.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmZXZlZGJxa2pnd3ljZHRyYW5tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI1Mzk4MDgsImV4cCI6MjEwODExNTgwOH0.RYainvFoFqOe-cF5CcjPPtGa3NJs4PHcqtDaZOrLbHY";
+    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    const DEVICE_KEY = "greenbank.device";
+    const NAME_KEY   = "greenbank.name";
+
+    const $ = (id) => document.getElementById(id);
+
+    function getDeviceId() {
+      let id = localStorage.getItem(DEVICE_KEY);
+      if (!id) {
+        id = "dev_" + Math.random().toString(36).slice(2, 8) + Date.now().toString(36).slice(-4);
+        localStorage.setItem(DEVICE_KEY, id);
+      }
+      return id;
+    }
+    function getName() { return localStorage.getItem(NAME_KEY) || "Guest"; }
+    function getIdentity() { return `${getName()}-${getDeviceId()}`; }
+
+    async function fetchBalance() {
+      const { data, error } = await sb
+        .from("submissions")
+        .select("points")
+        .eq("device_id", getDeviceId());
+      if (error) return 0;
+      return (data || []).reduce((s, r) => s + (r.points || 0), 0);
+    }
+
+    function show(id) {
+      ["stateLoading", "stateInvalid", "stateUsed", "stateSuccess"].forEach((s) => $(s).classList.add("hidden"));
+      if (id) $(id).classList.remove("hidden");
+    }
+
+    // ====== BOOT ======
+    (async function boot() {
+      const token = new URLSearchParams(location.search).get("qr");
+
+      if (!token) {
+        show("stateInvalid");
+        return;
+      }
+
+      // Scrub token from URL — refresh/rescan won't help
+      try {
+        const u = new URL(location.href);
+        u.searchParams.delete("qr");
+        history.replaceState({}, "", u.pathname);
+      } catch (_) {}
+
+      const { data, error } = await sb.rpc("redeem_qr_token", {
+        p_token: token,
+        p_device_id: getDeviceId(),
+        p_identity: getIdentity(),
+        p_name: getName(),
+      });
+
+      if (error || !data) {
+        show("stateInvalid");
+        return;
+      }
+
+      if (data.ok) {
+        const balance = await fetchBalance();
+        $("successBalance").textContent = balance.toLocaleString();
+        show("stateSuccess");
+      } else if (data.reason === "used") {
+        const balance = await fetchBalance();
+        $("usedBalance").textContent = balance.toLocaleString();
+        show("stateUsed");
+      } else {
+        show("stateInvalid");
+      }
+
+      $("shopSection").classList.remove("hidden");
+    })();
+
+    // ====== SHOP LOGIC ======
+    async function attemptPurchase(name, price) {
+      const balance = await fetchBalance();
+      if (balance < price) {
+        $("modalInfo").classList.add("hidden");
+        $("modalInsufficient").classList.remove("hidden");
+        $("modalLabel").textContent = "SHOP";
+        $("modalBack").classList.remove("hidden");
+      } else {
+        openInfo(name, price);
+      }
+    }
+
+    function openInfo(name, price) {
+      $("modalInsufficient").classList.add("hidden");
+      $("modalInfo").classList.remove("hidden");
+      $("modalLabel").textContent = "INFO";
+      $("infoTitle").textContent = name;
+      $("infoText").innerHTML =
+        `Order your <strong>${name.toLowerCase()}</strong> by messaging <strong>@carmedia.in</strong> on Instagram. ` +
+        `Our team will verify your points and confirm the order via a direct message. ` +
+        `You'll then share your delivery details, and the product will ship to your door. ` +
+        `Total cost: <strong>${price.toLocaleString()} points</strong>.`;
+      $("modalBack").classList.remove("hidden");
+    }
+
+    function closeModal() {
+      $("modalBack").classList.add("hidden");
+    }
+
+    $("modalBack").addEventListener("click", (e) => {
+      if (e.target === $("modalBack")) closeModal();
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") closeModal();
+    });
+  </script>
+</body>
+</html>
