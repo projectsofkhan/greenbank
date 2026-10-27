@@ -256,6 +256,7 @@
 
     const DEVICE_KEY = "greenbank.device";
     const NAME_KEY   = "greenbank.name";
+    const POINTS_KEY = "greenbank.points";
     const $ = (id) => document.getElementById(id);
 
     function getDeviceId() {
@@ -268,14 +269,28 @@
     }
     function getName() { return localStorage.getItem(NAME_KEY) || "Guest"; }
     function getIdentity() { return `${getName()}-${getDeviceId()}`; }
+    function getCachedPoints() {
+      return parseInt(localStorage.getItem(POINTS_KEY) || "0", 10) || 0;
+    }
+    function setCachedPoints(v) {
+      localStorage.setItem(POINTS_KEY, String(v));
+    }
 
     async function fetchBalance() {
-      const { data, error } = await sb
-        .from("submissions")
-        .select("points")
-        .eq("device_id", getDeviceId());
-      if (error) return 0;
-      return (data || []).reduce((s, r) => s + (r.points || 0), 0);
+      try {
+        const { data, error } = await sb
+          .from("submissions")
+          .select("points")
+          .eq("device_id", getDeviceId());
+        if (error) {
+          console.warn("[balance] fetch failed:", error);
+          return null;
+        }
+        return (data || []).reduce((s, r) => s + (r.points || 0), 0);
+      } catch (e) {
+        console.warn("[balance] exception:", e);
+        return null;
+      }
     }
 
     function show(id) {
@@ -294,6 +309,9 @@
         history.replaceState({}, "", u.pathname);
       } catch (_) {}
 
+      const cachedBefore = getCachedPoints();
+      console.log("[scan] cached balance before =", cachedBefore);
+
       const { data, error } = await sb.rpc("redeem_qr_token", {
         p_token: token,
         p_device_id: getDeviceId(),
@@ -301,14 +319,32 @@
         p_name: getName(),
       });
 
-      if (error || !data) { show("stateInvalid"); return; }
+      if (error || !data) {
+        console.warn("[scan] RPC error:", error);
+        show("stateInvalid");
+        return;
+      }
+
+      console.log("[scan] RPC result:", data);
 
       if (data.ok) {
-        const balance = await fetchBalance();
-        $("successBalance").textContent = balance.toLocaleString();
+        const awarded = Number(data.points) || 100;
+        const newBalance = cachedBefore + awarded;
+
+        setCachedPoints(newBalance);
+        $("successBalance").textContent = newBalance.toLocaleString();
         show("stateSuccess");
+
+        fetchBalance().then((serverTotal) => {
+          if (serverTotal === null) return;
+          if (serverTotal >= newBalance) {
+            setCachedPoints(serverTotal);
+            $("successBalance").textContent = serverTotal.toLocaleString();
+          }
+        });
       } else if (data.reason === "used") {
-        const balance = await fetchBalance();
+        let balance = await fetchBalance();
+        if (balance === null) balance = cachedBefore;
         $("usedBalance").textContent = balance.toLocaleString();
         show("stateUsed");
       } else {
@@ -319,7 +355,11 @@
     })();
 
     async function attemptPurchase(name, price) {
-      const balance = await fetchBalance();
+      let balance = await fetchBalance();
+      if (balance === null) balance = getCachedPoints();
+
+      console.log("[shop] balance =", balance, "price =", price);
+
       if (balance < price) {
         $("modalInfo").classList.add("hidden");
         $("modalInsufficient").classList.remove("hidden");
