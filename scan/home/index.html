@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Green Bank · Rewards Home</title>
+  <meta name="robots" content="noindex, nofollow" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --green-900: #0f3d2e;
+      --green-700: #176b4d;
+      --green-500: #22a06b;
+      --green-300: #6ed6a2;
+      --green-100: #e6f6ee;
+      --ink: #0b0f0d;
+      --muted: #6b7770;
+      --line: #d9e0db;
+      --bg: #f4f7f5;
+      --white: #ffffff;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    html, body {
+      min-height: 100%;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      font-size: 16px;
+      line-height: 1.5;
+    }
+    body { display: flex; flex-direction: column; min-height: 100vh; }
+
+    /* Topbar */
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--line);
+      background: var(--white);
+    }
+    .brand-logo { height: 32px; width: auto; display: block; }
+    .brand-fallback {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.22em;
+    }
+    .brand-fallback::before {
+      content: "";
+      width: 10px; height: 10px;
+      background: var(--green-500);
+    }
+    .member-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      border: 1px solid var(--line);
+      background: var(--white);
+    }
+    .member-label {
+      font-size: 0.62rem;
+      font-weight: 700;
+      letter-spacing: 0.2em;
+      color: var(--muted);
+    }
+    .member-name {
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      color: var(--ink);
+      text-transform: uppercase;
+    }
+
+    /* Page */
+    .page {
+      flex: 1;
+      width: 100%;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 40px 24px 72px;
+      display: flex;
+      flex-direction: column;
+      gap: 48px;
+    }
+
+    /* Hero */
+    .hero {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .label {
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.24em;
+      color: var(--green-700);
+    }
+    .hero h1 {
+      font-size: 2.2rem;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+      color: var(--ink);
+      max-width: 640px;
+    }
+    .hero .sub {
+      font-size: 1rem;
+      color: var(--muted);
+      max-width: 560px;
+      line-height: 1.6;
+    }
+
+    /* Stats strip */
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      background: var(--white);
+      border: 1px solid var(--line);
+    }
+    .stat {
+      padding: 20px 24px;
+      border-right: 1px solid var(--line);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .stat:last-child { border-right: none; }
+    .stat-label {
+      font-size: 0.62rem;
+      font-weight: 700;
+      letter-spacing: 0.22em;
+      color: var(--muted);
+    }
+    .stat-value {
+      font-size: 1.5rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: var(--ink);
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* How it works */
+    .how {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .how h2 {
+      font-size: 1.6rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: var(--ink);
+    }
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+    .step {
+      background: var(--white);
+      border: 1px solid var(--line);
+      padding: 24px 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .step-num {
+      font-size: 0.7rem;
+      font-weight: 800;
+      letter-spacing: 0.24em;
+      color: var(--green-700);
+    }
+    .step-title {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--ink);
+    }
+    .step-desc {
+      font-size: 0.85rem;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    /* Shop */
+    .shop { display: flex; flex-direction: column; gap: 20px; }
+    .shop h2 {
+      font-size: 1.6rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: var(--ink);
+    }
+    .shop .sub {
+      font-size: 0.9rem;
+      color: var(--muted);
+      max-width: 560px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+    .card {
+      background: var(--white);
+      border: 1px solid var(--line);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .card-media {
+      position: relative;
+      aspect-ratio: 4 / 5;
+      background: var(--green-100);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    .card-media img {
+      width: 100%; height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .card-media.ph { background: var(--green-700); }
+    .card-media .ph-text {
+      display: none;
+      color: var(--white);
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.22em;
+      text-align: center;
+    }
+    .card-media.ph .ph-text { display: block; }
+
+    .card-body {
+      padding: 14px 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      flex: 1;
+    }
+    .card-name {
+      font-size: 0.92rem;
+      font-weight: 600;
+      color: var(--ink);
+    }
+    .card-desc {
+      font-size: 0.75rem;
+      color: var(--muted);
+      line-height: 1.45;
+      flex: 1;
+      margin-bottom: 4px;
+    }
+    .card-price {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--green-700);
+      font-variant-numeric: tabular-nums;
+      margin-bottom: 6px;
+    }
+    .card-price span {
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: var(--muted);
+      letter-spacing: 0.08em;
+      margin-left: 2px;
+    }
+    .card-actions { display: flex; gap: 6px; }
+
+    .btn {
+      border: none;
+      cursor: pointer;
+      font-family: inherit;
+      font-weight: 600;
+      font-size: 0.82rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+      min-height: 36px;
+      text-decoration: none;
+    }
+    .btn.solid {
+      flex: 1;
+      background: var(--green-700);
+      color: var(--white);
+      padding: 10px 12px;
+    }
+    .btn.solid:hover { background: var(--green-900); }
+    .btn.ghost {
+      width: 36px;
+      background: transparent;
+      border: 1px solid var(--line);
+      color: var(--muted);
+      flex-shrink: 0;
+    }
+    .btn.ghost:hover { border-color: var(--green-500); color: var(--green-700); }
+
+    /* Note */
+    .note {
+      background: var(--green-100);
+      border-left: 3px solid var(--green-500);
+      padding: 18px 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .note-text {
+      font-size: 0.88rem;
+      color: var(--ink);
+      line-height: 1.55;
+    }
+
+    /* Footer */
+    .foot {
+      border-top: 1px solid var(--line);
+      background: var(--white);
+      padding: 16px 24px;
+      text-align: center;
+    }
+    .foot span {
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.22em;
+      color: var(--muted);
+    }
+    .foot a {
+      color: var(--green-700);
+      text-decoration: none;
+      border-bottom: 1px solid var(--green-300);
+    }
+    .foot a:hover { color: var(--green-900); }
+
+    /* Modal */
+    .modal-back {
+      position: fixed;
+      inset: 0;
+      background: rgba(11, 15, 13, 0.55);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      padding: 20px;
+    }
+    .modal-back.hidden { display: none; }
+    .modal {
+      background: var(--white);
+      border: 1px solid var(--line);
+      width: min(460px, 100%);
+      max-height: 88vh;
+      overflow-y: auto;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .modal-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .modal-close {
+      width: 32px; height: 32px;
+      border: 1px solid var(--line);
+      background: var(--white);
+      color: var(--muted);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-close:hover { color: var(--green-700); border-color: var(--green-500); }
+    .modal h3 {
+      font-size: 1.15rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+    .modal-text {
+      font-size: 0.9rem;
+      color: var(--ink);
+      line-height: 1.55;
+    }
+    .modal-text strong { color: var(--green-700); font-weight: 600; }
+    .modal-note {
+      font-size: 0.8rem;
+      color: var(--muted);
+      padding: 10px 12px;
+      background: var(--green-100);
+      border-left: 3px solid var(--green-500);
+      margin-top: 4px;
+    }
+    .insta {
+      margin-top: 8px;
+      background: var(--green-700);
+      color: var(--white);
+      padding: 12px 16px;
+      font-size: 0.85rem;
+      justify-content: center;
+      width: 100%;
+    }
+    .insta:hover { background: var(--green-900); }
+    .detail-list {
+      border-top: 1px solid var(--line);
+      margin-top: 4px;
+    }
+    .detail {
+      display: flex;
+      gap: 16px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--line);
+      align-items: baseline;
+    }
+    .detail:last-child { border-bottom: none; }
+    .detail-key {
+      width: 110px;
+      flex-shrink: 0;
+      font-size: 0.62rem;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+    .detail-val {
+      font-size: 0.86rem;
+      color: var(--ink);
+      line-height: 1.5;
+    }
+    .detail-val strong { color: var(--green-700); font-weight: 600; }
+
+    .hidden { display: none !important; }
+
+    /* Mobile */
+    @media (max-width: 720px) {
+      .page { padding: 24px 16px 56px; gap: 32px; }
+      .hero h1 { font-size: 1.6rem; }
+      .hero .sub { font-size: 0.9rem; }
+
+      .stats { grid-template-columns: 1fr; }
+      .stat { border-right: none; border-bottom: 1px solid var(--line); padding: 16px 20px; }
+      .stat:last-child { border-bottom: none; }
+      .stat-value { font-size: 1.25rem; }
+
+      .how h2, .shop h2 { font-size: 1.3rem; }
+      .steps { grid-template-columns: 1fr; gap: 10px; }
+      .step { padding: 18px 18px; }
+
+      .grid { grid-template-columns: 1fr; gap: 10px; }
+      .card { flex-direction: row; align-items: stretch; }
+      .card-media { width: 110px; flex-shrink: 0; aspect-ratio: auto; }
+      .card-body { padding: 12px 14px; }
+      .card-desc { font-size: 0.72rem; }
+
+      .detail { flex-direction: column; gap: 4px; }
+      .detail-key { width: auto; }
+    }
+  </style>
+</head>
+<body>
+
+  <header class="topbar">
+    <img src="/da.png" alt="Green Bank" class="brand-logo"
+         onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" />
+    <div class="brand-fallback">GREEN BANK</div>
+
+    <div class="member-chip">
+      <span class="member-label">MEMBER</span>
+      <span class="member-name" id="memberName">GUEST</span>
+    </div>
+  </header>
+
+  <main class="page">
+
+    <section class="hero">
+      <div class="label">WELCOME</div>
+      <h1>Green Bank Rewards</h1>
+      <p class="sub">
+        Scan the QR code on any Green Bank station to earn 100 points per scan.
+        Redeem your points for posters and frames, delivered to your door.
+      </p>
+    </section>
+
+    <section class="stats">
+      <div class="stat">
+        <div class="stat-label">BALANCE</div>
+        <div class="stat-value" id="balanceValue">—</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">TOTAL SCANS</div>
+        <div class="stat-value" id="scansValue">—</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">RANK</div>
+        <div class="stat-value" id="rankValue">—</div>
+      </div>
+    </section>
+
+    <section class="how">
+      <div class="label">HOW IT WORKS</div>
+      <h2>Three steps to rewards</h2>
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">STEP 01</div>
+          <div class="step-title">Scan a QR code</div>
+          <p class="step-desc">Every Green Bank station prints a unique QR on the bin. Scan it with your phone's camera.</p>
+        </div>
+        <div class="step">
+          <div class="step-num">STEP 02</div>
+          <div class="step-title">Earn 100 points</div>
+          <p class="step-desc">Each valid scan adds 100 points to your account. Each physical QR can be used only once.</p>
+        </div>
+        <div class="step">
+          <div class="step-num">STEP 03</div>
+          <div class="step-title">Order rewards</div>
+          <p class="step-desc">Redeem your points for posters or framed prints from Carmedia, delivered in 4–9 days.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="shop">
+      <div class="label">REWARDS</div>
+      <h2>Available to order</h2>
+      <p class="sub">All products are fulfilled by Carmedia. Orders are placed via Instagram DM.</p>
+
+      <div class="grid">
+        <article class="card">
+          <div class="card-media">
+            <img src="/posters.gif" alt="Poster" onerror="this.parentElement.classList.add('ph'); this.remove();" />
+            <div class="ph-text">POSTER</div>
+          </div>
+          <div class="card-body">
+            <div class="card-name">Poster</div>
+            <div class="card-desc">Single A2 poster, printed on premium matte paper.</div>
+            <div class="card-price">1,000 <span>pts</span></div>
+            <div class="card-actions">
+              <button class="btn solid" onclick="attemptPurchase('Poster', 1000)">Purchase</button>
+              <button class="btn ghost" onclick="openInfo('Poster', 1000)" aria-label="More info">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+                  <circle cx="12" cy="12" r="10"/>
+                  <line x1="12" y1="16" x2="12" y2="12"/>
+                  <line x1="12" y1="8" x2="12.01" y2="8"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="card-media">
+            <img src="/posters.gif" alt="2 Posters" onerror="this.parentElement.classList.add('ph'); this.remove();" />
+            <div class="ph-text">2 POSTERS</div>
+          </div>
+          <div class="card-body">
+            <div class="card-name">2 Posters</div>
+            <div class="card-desc">Two A2 posters of your choice — save 400 points.</div>
+            <div class="card-price">1,600 <span>pts</span></div>
+            <div class="card-actions">
+              <button class="btn solid" onclick="attemptPurchase('2 Posters', 1600)">Purchase</button>
+              <button class="btn ghost" onclick="openInfo('2 Posters', 1600)" aria-label="More info">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+                  <circle cx="12" cy="12" r="10"/>
+                  <line x1="12" y1="16" x2="12" y2="12"/>
+                  <line x1="12" y1="8" x2="12.01" y2="8"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="card-media">
+            <img src="/posters.gif" alt="Frame" onerror="this.parentElement.classList.add('ph'); this.remove();" />
+            <div class="ph-text">FRAME</div>
+          </div>
+          <div class="card-body">
+            <div class="card-name">Frame</div>
+            <div class="card-desc">Poster with a solid wood frame, ready to hang.</div>
+            <div class="card-price">3,000 <span>pts</span></div>
+            <div class="card-actions">
+              <button class="btn solid" onclick="attemptPurchase('Frame', 3000)">Purchase</button>
+              <button class="btn ghost" onclick="openInfo('Frame', 3000)" aria-label="More info">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+                  <circle cx="12" cy="12" r="10"/>
+                  <line x1="12" y1="16" x2="12" y2="12"/>
+                  <line x1="12" y1="8" x2="12.01" y2="8"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="note">
+      <div class="label">NOTE</div>
+      <p class="note-text">
+        Points are verified by our team before orders ship. Delivery usually takes 4–9 days after confirmation.
+        To earn more points, visit any Green Bank station and scan the QR code on the bin.
+      </p>
+    </section>
+
+  </main>
+
+  <footer class="foot">
+    <span>REWARDS FULFILLED BY <a href="https://instagram.com/carmedia.in" target="_blank" rel="noopener noreferrer">@CARmedia.in</a></span>
+  </footer>
+
+  <div class="modal-back hidden" id="modalBack">
+    <div class="modal">
+      <div class="modal-top">
+        <div class="label" id="modalLabel">INFO</div>
+        <button class="modal-close" onclick="closeModal()" aria-label="Close">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+
+      <div id="modalInfo">
+        <h3 id="infoTitle">Poster</h3>
+        <p class="modal-text" id="infoText"></p>
+        <div class="detail-list">
+          <div class="detail">
+            <span class="detail-key">Order via</span>
+            <span class="detail-val">Instagram DM to <strong>@carmedia.in</strong></span>
+          </div>
+          <div class="detail">
+            <span class="detail-key">Verification</span>
+            <span class="detail-val">Our team confirms your points before the order is processed.</span>
+          </div>
+          <div class="detail">
+            <span class="detail-key">Delivery</span>
+            <span class="detail-val">Usually 4–9 days after confirmation.</span>
+          </div>
+        </div>
+        <a class="btn solid insta" href="https://instagram.com/carmedia.in" target="_blank" rel="noopener noreferrer">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <rect x="3" y="3" width="18" height="18" rx="5"/>
+            <circle cx="12" cy="12" r="4"/>
+            <circle cx="17.5" cy="6.5" r="0.5" fill="currentColor"/>
+          </svg>
+          @carmedia.in
+        </a>
+      </div>
+
+      <div id="modalInsufficient" class="hidden">
+        <h3>Not enough points</h3>
+        <p class="modal-text">You don't have enough points to purchase this product.</p>
+        <div class="detail-list">
+          <div class="detail">
+            <span class="detail-key">Your balance</span>
+            <span class="detail-val" id="insufficientBalance">0</span>
+          </div>
+          <div class="detail">
+            <span class="detail-key">Required</span>
+            <span class="detail-val" id="insufficientRequired">0</span>
+          </div>
+        </div>
+        <p class="modal-note">Scan more QR codes from Green Bank stations to earn additional points.</p>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    const SUPABASE_URL      = "https://hfevedbqkjgwycdtranm.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmZXZlZGJxa2pnd3ljZHRyYW5tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI1Mzk4MDgsImV4cCI6MjEwODExNTgwOH0.RYainvFoFqOe-cF5CcjPPtGa3NJs4PHcqtDaZOrLbHY";
+    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    const DEVICE_KEY = "greenbank.device";
+    const NAME_KEY   = "greenbank.name";
+    const POINTS_KEY = "greenbank.points";
+    const $ = (id) => document.getElementById(id);
+
+    function getDeviceId() {
+      let id = localStorage.getItem(DEVICE_KEY);
+      if (!id) {
+        id = "dev_" + Math.random().toString(36).slice(2, 8) + Date.now().toString(36).slice(-4);
+        localStorage.setItem(DEVICE_KEY, id);
+      }
+      return id;
+    }
+    function getName() { return localStorage.getItem(NAME_KEY) || "Guest"; }
+    function getIdentity() { return `${getName()}-${getDeviceId()}`; }
+
+    async function fetchServerTotal() {
+      try {
+        const { data, error } = await sb
+          .from("submissions").select("points")
+          .eq("device_id", getDeviceId());
+        if (error) return null;
+        return (data || []).reduce((s, r) => s + (r.points || 0), 0);
+      } catch (e) { return null; }
+    }
+
+    async function fetchStats() {
+      const deviceId = getDeviceId();
+      const identity = getIdentity();
+      const [subsRes, lbRes] = await Promise.all([
+        sb.from("submissions").select("points").eq("device_id", deviceId),
+        sb.from("leaderboard").select("identity, total_points").order("total_points", { ascending: false }),
+      ]);
+      const total = (subsRes.data || []).reduce((s, r) => s + (r.points || 0), 0);
+      const scans = (subsRes.data || []).length;
+      let rank = "—";
+      if (lbRes.data) {
+        const idx = lbRes.data.findIndex((r) => r.identity === identity);
+        if (idx >= 0) rank = "#" + (idx + 1);
+      }
+      return { total, scans, rank };
+    }
+
+    (async function boot() {
+      $("memberName").textContent = (getName() || "GUEST").toUpperCase();
+
+      const stats = await fetchStats();
+      $("balanceValue").textContent = stats.total.toLocaleString();
+      $("scansValue").textContent = stats.scans;
+      $("rankValue").textContent = stats.rank;
+      localStorage.setItem(POINTS_KEY, String(stats.total));
+    })();
+
+    async function attemptPurchase(name, price) {
+      let balance = await fetchServerTotal();
+      if (balance === null) balance = parseInt(localStorage.getItem(POINTS_KEY) || "0", 10) || 0;
+
+      if (balance < price) {
+        $("modalInfo").classList.add("hidden");
+        $("modalInsufficient").classList.remove("hidden");
+        $("modalLabel").textContent = "SHOP";
+        $("insufficientBalance").textContent = balance.toLocaleString() + " pts";
+        $("insufficientRequired").textContent = price.toLocaleString() + " pts";
+        $("modalBack").classList.remove("hidden");
+      } else {
+        openInfo(name, price);
+      }
+    }
+
+    function openInfo(name, price) {
+      $("modalInsufficient").classList.add("hidden");
+      $("modalInfo").classList.remove("hidden");
+      $("modalLabel").textContent = "ORDER";
+      $("infoTitle").textContent = name;
+      $("infoText").innerHTML =
+        `Order your <strong>${name.toLowerCase()}</strong> by messaging <strong>@carmedia.in</strong> on Instagram. ` +
+        `Total cost: <strong>${price.toLocaleString()} points</strong>.`;
+      $("modalBack").classList.remove("hidden");
+    }
+
+    function closeModal() { $("modalBack").classList.add("hidden"); }
+    $("modalBack").addEventListener("click", (e) => { if (e.target === $("modalBack")) closeModal(); });
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeModal(); });
+  </script>
+</body>
+</html>
