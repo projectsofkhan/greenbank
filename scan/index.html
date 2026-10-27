@@ -8,13 +8,13 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="scan.css" />
+  <link rel="stylesheet" href="/scan/scan.css" />
 </head>
 <body>
 
   <header class="mark">
-    <div class="mark-dot"></div>
-    <span>GREEN BANK</span>
+    <img src="/da.png" alt="Green Bank" class="mark-logo" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" />
+    <div class="mark-fallback">GREEN BANK</div>
   </header>
 
   <main class="wrap">
@@ -23,57 +23,104 @@
     <section class="state" id="stateLoading">
       <div class="label">VERIFYING</div>
       <h1>Checking your code…</h1>
+      <p class="sub">This takes a moment. Please do not close the page.</p>
       <div class="loader"></div>
     </section>
 
     <!-- STATE: invalid -->
     <section class="state hidden" id="stateInvalid">
-      <div class="label">LINK</div>
-      <h1>Invalid or expired link.</h1>
-      <p class="sub">This QR code is not recognized. Please contact the station.</p>
+      <div class="label">INVALID CODE</div>
+      <h1>This QR code is not recognized.</h1>
+      <p class="sub">
+        The link you opened is either incomplete, mistyped, or was never issued by Green Bank.
+        Every valid QR begins with <strong>mygreenbank.vercel.app/scan/</strong> followed by a unique code.
+      </p>
+      <div class="detail-list">
+        <div class="detail">
+          <span class="detail-key">Reason</span>
+          <span class="detail-val">QR code not found in our system.</span>
+        </div>
+        <div class="detail">
+          <span class="detail-key">What to do</span>
+          <span class="detail-val">Return to the Green Bank station and scan the QR code printed on the bin.</span>
+        </div>
+        <div class="detail">
+          <span class="detail-key">Support</span>
+          <span class="detail-val">Contact the station team if you believe this is an error.</span>
+        </div>
+      </div>
     </section>
 
     <!-- STATE: used -->
     <section class="state hidden" id="stateUsed">
-      <div class="label">LINK</div>
+      <div class="label">ALREADY REDEEMED</div>
       <h1>This QR has already been used.</h1>
-      <p class="sub">Each QR code is valid for a single scan only.</p>
+      <p class="sub">
+        Each physical QR code can be scanned only once. This one has already been claimed by a Green Bank member.
+        Points were awarded at the time of the first scan.
+      </p>
       <div class="balance-row">
         <span class="balance-label">YOUR BALANCE</span>
         <span class="balance-value" id="usedBalance">0</span>
+      </div>
+      <div class="detail-list">
+        <div class="detail">
+          <span class="detail-key">Status</span>
+          <span class="detail-val">Single-use code — permanently redeemed.</span>
+        </div>
+        <div class="detail">
+          <span class="detail-key">Next step</span>
+          <span class="detail-val">Scan a fresh QR from any Green Bank station to earn more points.</span>
+        </div>
       </div>
     </section>
 
     <!-- STATE: success -->
     <section class="state hidden" id="stateSuccess">
-      <div class="label">REWARD</div>
+      <div class="label">REWARD RECEIVED</div>
       <h1 class="big-plus">+100</h1>
-      <p class="sub">Points added to your account.</p>
+      <p class="sub">Points added to your account. Your balance has been updated.</p>
 
       <div class="balance-row">
         <span class="balance-label">YOUR BALANCE</span>
         <span class="balance-value" id="successBalance">0</span>
       </div>
+
+      <div class="detail-list">
+        <div class="detail">
+          <span class="detail-key">Source</span>
+          <span class="detail-val">Green Bank physical QR code.</span>
+        </div>
+        <div class="detail">
+          <span class="detail-key">Status</span>
+          <span class="detail-val">Redeemed successfully — this code cannot be used again.</span>
+        </div>
+        <div class="detail">
+          <span class="detail-key">Redeem</span>
+          <span class="detail-val">Use your points below to order posters or frames from Carmedia.</span>
+        </div>
+      </div>
     </section>
 
-    <!-- SHOP (shown in success or used states) -->
+    <!-- SHOP -->
     <section class="shop hidden" id="shopSection">
       <div class="shop-head">
         <div class="label">SHOP</div>
         <h2>Redeem your points</h2>
-        <p class="sub">Physical products are fulfilled by Carmedia.</p>
+        <p class="sub">Physical products are fulfilled by Carmedia. Orders are placed via Instagram DM.</p>
       </div>
 
       <div class="grid">
 
-        <!-- Product 1: Poster -->
+        <!-- Poster -->
         <article class="card">
           <div class="card-media">
-            <img src="/img1.png" alt="Poster" onerror="this.parentElement.classList.add('ph'); this.remove();" />
+            <img src="/posters.gif" alt="Poster" onerror="this.parentElement.classList.add('ph'); this.remove();" />
             <div class="ph-text">POSTER</div>
           </div>
           <div class="card-body">
             <div class="card-name">Poster</div>
+            <div class="card-desc">Single A2 poster, printed on premium matte paper.</div>
             <div class="card-price">1,000 <span>pts</span></div>
             <div class="card-actions">
               <button class="btn solid" onclick="attemptPurchase('Poster', 1000)">Purchase</button>
@@ -88,14 +135,15 @@
           </div>
         </article>
 
-        <!-- Product 2: 2 Posters -->
+        <!-- 2 Posters -->
         <article class="card">
           <div class="card-media">
-            <img src="/img2.png" alt="2 Posters" onerror="this.parentElement.classList.add('ph'); this.remove();" />
+            <img src="/posters.gif" alt="2 Posters" onerror="this.parentElement.classList.add('ph'); this.remove();" />
             <div class="ph-text">2 POSTERS</div>
           </div>
           <div class="card-body">
             <div class="card-name">2 Posters</div>
+            <div class="card-desc">Two A2 posters of your choice — save 400 points.</div>
             <div class="card-price">1,600 <span>pts</span></div>
             <div class="card-actions">
               <button class="btn solid" onclick="attemptPurchase('2 Posters', 1600)">Purchase</button>
@@ -110,14 +158,15 @@
           </div>
         </article>
 
-        <!-- Product 3: Frame -->
+        <!-- Frame -->
         <article class="card">
           <div class="card-media">
-            <img src="/img3.png" alt="Frame" onerror="this.parentElement.classList.add('ph'); this.remove();" />
+            <img src="/posters.gif" alt="Frame" onerror="this.parentElement.classList.add('ph'); this.remove();" />
             <div class="ph-text">FRAME</div>
           </div>
           <div class="card-body">
             <div class="card-name">Frame</div>
+            <div class="card-desc">Poster with a solid wood frame, ready to hang.</div>
             <div class="card-price">3,000 <span>pts</span></div>
             <div class="card-actions">
               <button class="btn solid" onclick="attemptPurchase('Frame', 3000)">Purchase</button>
@@ -141,7 +190,7 @@
     <span>REWARDS FULFILLED BY <a href="https://instagram.com/carmedia.in" target="_blank" rel="noopener noreferrer">@CARmedia.in</a></span>
   </footer>
 
-  <!-- INFO / PURCHASE MODAL -->
+  <!-- MODAL -->
   <div class="modal-back hidden" id="modalBack">
     <div class="modal">
       <div class="modal-top">
@@ -154,11 +203,23 @@
         </button>
       </div>
 
-      <!-- Info variant -->
       <div id="modalInfo">
         <h3 id="infoTitle">Poster</h3>
         <p class="modal-text" id="infoText"></p>
-        <p class="modal-note">Delivery usually takes 4–9 days.</p>
+        <div class="detail-list">
+          <div class="detail">
+            <span class="detail-key">Order via</span>
+            <span class="detail-val">Instagram DM to <strong>@carmedia.in</strong></span>
+          </div>
+          <div class="detail">
+            <span class="detail-key">Verification</span>
+            <span class="detail-val">Our team confirms your points before the order is processed.</span>
+          </div>
+          <div class="detail">
+            <span class="detail-key">Delivery</span>
+            <span class="detail-val">Usually 4–9 days after confirmation.</span>
+          </div>
+        </div>
         <a class="btn solid insta" href="https://instagram.com/carmedia.in" target="_blank" rel="noopener noreferrer">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
             <rect x="3" y="3" width="18" height="18" rx="5"/>
@@ -169,26 +230,32 @@
         </a>
       </div>
 
-      <!-- Not enough points variant -->
       <div id="modalInsufficient" class="hidden">
         <h3>Not enough points</h3>
         <p class="modal-text">You don't have enough points to purchase this product.</p>
-        <p class="modal-note">Scan more QR codes from the dustbins to earn points.</p>
+        <div class="detail-list">
+          <div class="detail">
+            <span class="detail-key">Your balance</span>
+            <span class="detail-val" id="insufficientBalance">0</span>
+          </div>
+          <div class="detail">
+            <span class="detail-key">Required</span>
+            <span class="detail-val" id="insufficientRequired">0</span>
+          </div>
+        </div>
+        <p class="modal-note">Scan more QR codes from Green Bank stations to earn additional points.</p>
       </div>
-
     </div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
-    // ====== CONFIG ======
     const SUPABASE_URL      = "https://hfevedbqkjgwycdtranm.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmZXZlZGJxa2pnd3ljZHRyYW5tIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI1Mzk4MDgsImV4cCI6MjEwODExNTgwOH0.RYainvFoFqOe-cF5CcjPPtGa3NJs4PHcqtDaZOrLbHY";
     const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     const DEVICE_KEY = "greenbank.device";
     const NAME_KEY   = "greenbank.name";
-
     const $ = (id) => document.getElementById(id);
 
     function getDeviceId() {
@@ -216,16 +283,11 @@
       if (id) $(id).classList.remove("hidden");
     }
 
-    // ====== BOOT ======
     (async function boot() {
       const token = new URLSearchParams(location.search).get("qr");
 
-      if (!token) {
-        show("stateInvalid");
-        return;
-      }
+      if (!token) { show("stateInvalid"); return; }
 
-      // Scrub token from URL — refresh/rescan won't help
       try {
         const u = new URL(location.href);
         u.searchParams.delete("qr");
@@ -239,10 +301,7 @@
         p_name: getName(),
       });
 
-      if (error || !data) {
-        show("stateInvalid");
-        return;
-      }
+      if (error || !data) { show("stateInvalid"); return; }
 
       if (data.ok) {
         const balance = await fetchBalance();
@@ -259,13 +318,14 @@
       $("shopSection").classList.remove("hidden");
     })();
 
-    // ====== SHOP LOGIC ======
     async function attemptPurchase(name, price) {
       const balance = await fetchBalance();
       if (balance < price) {
         $("modalInfo").classList.add("hidden");
         $("modalInsufficient").classList.remove("hidden");
         $("modalLabel").textContent = "SHOP";
+        $("insufficientBalance").textContent = balance.toLocaleString() + " pts";
+        $("insufficientRequired").textContent = price.toLocaleString() + " pts";
         $("modalBack").classList.remove("hidden");
       } else {
         openInfo(name, price);
@@ -275,26 +335,17 @@
     function openInfo(name, price) {
       $("modalInsufficient").classList.add("hidden");
       $("modalInfo").classList.remove("hidden");
-      $("modalLabel").textContent = "INFO";
+      $("modalLabel").textContent = "ORDER";
       $("infoTitle").textContent = name;
       $("infoText").innerHTML =
         `Order your <strong>${name.toLowerCase()}</strong> by messaging <strong>@carmedia.in</strong> on Instagram. ` +
-        `Our team will verify your points and confirm the order via a direct message. ` +
-        `You'll then share your delivery details, and the product will ship to your door. ` +
         `Total cost: <strong>${price.toLocaleString()} points</strong>.`;
       $("modalBack").classList.remove("hidden");
     }
 
-    function closeModal() {
-      $("modalBack").classList.add("hidden");
-    }
-
-    $("modalBack").addEventListener("click", (e) => {
-      if (e.target === $("modalBack")) closeModal();
-    });
-    document.addEventListener("keydown", (e) => {
-      if (e.key === "Escape") closeModal();
-    });
+    function closeModal() { $("modalBack").classList.add("hidden"); }
+    $("modalBack").addEventListener("click", (e) => { if (e.target === $("modalBack")) closeModal(); });
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeModal(); });
   </script>
 </body>
 </html>
