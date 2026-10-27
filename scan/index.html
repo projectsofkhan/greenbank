@@ -19,7 +19,6 @@
 
   <main class="wrap">
 
-    <!-- STATE: loading -->
     <section class="state" id="stateLoading">
       <div class="label">VERIFYING</div>
       <h1>Checking your code…</h1>
@@ -27,7 +26,6 @@
       <div class="loader"></div>
     </section>
 
-    <!-- STATE: invalid -->
     <section class="state hidden" id="stateInvalid">
       <div class="label">INVALID CODE</div>
       <h1>This QR code is not recognized.</h1>
@@ -51,7 +49,6 @@
       </div>
     </section>
 
-    <!-- STATE: used -->
     <section class="state hidden" id="stateUsed">
       <div class="label">ALREADY REDEEMED</div>
       <h1>This QR has already been used.</h1>
@@ -75,7 +72,6 @@
       </div>
     </section>
 
-    <!-- STATE: success -->
     <section class="state hidden" id="stateSuccess">
       <div class="label">REWARD RECEIVED</div>
       <h1 class="big-plus">+100</h1>
@@ -102,7 +98,6 @@
       </div>
     </section>
 
-    <!-- SHOP -->
     <section class="shop hidden" id="shopSection">
       <div class="shop-head">
         <div class="label">SHOP</div>
@@ -112,7 +107,6 @@
 
       <div class="grid">
 
-        <!-- Poster -->
         <article class="card">
           <div class="card-media">
             <img src="/posters.gif" alt="Poster" onerror="this.parentElement.classList.add('ph'); this.remove();" />
@@ -135,7 +129,6 @@
           </div>
         </article>
 
-        <!-- 2 Posters -->
         <article class="card">
           <div class="card-media">
             <img src="/posters.gif" alt="2 Posters" onerror="this.parentElement.classList.add('ph'); this.remove();" />
@@ -158,7 +151,6 @@
           </div>
         </article>
 
-        <!-- Frame -->
         <article class="card">
           <div class="card-media">
             <img src="/posters.gif" alt="Frame" onerror="this.parentElement.classList.add('ph'); this.remove();" />
@@ -190,7 +182,6 @@
     <span>REWARDS FULFILLED BY <a href="https://instagram.com/carmedia.in" target="_blank" rel="noopener noreferrer">@CARmedia.in</a></span>
   </footer>
 
-  <!-- MODAL -->
   <div class="modal-back hidden" id="modalBack">
     <div class="modal">
       <div class="modal-top">
@@ -269,14 +260,9 @@
     }
     function getName() { return localStorage.getItem(NAME_KEY) || "Guest"; }
     function getIdentity() { return `${getName()}-${getDeviceId()}`; }
-    function getCachedPoints() {
-      return parseInt(localStorage.getItem(POINTS_KEY) || "0", 10) || 0;
-    }
-    function setCachedPoints(v) {
-      localStorage.setItem(POINTS_KEY, String(v));
-    }
 
-    async function fetchBalance() {
+    // Fetch server total — the ONLY source of truth for display
+    async function fetchServerTotal() {
       try {
         const { data, error } = await sb
           .from("submissions")
@@ -291,6 +277,16 @@
         console.warn("[balance] exception:", e);
         return null;
       }
+    }
+
+    // Try up to 3 times, in case replication hasn't caught up yet
+    async function fetchServerTotalWithRetry(attempts = 3) {
+      for (let i = 0; i < attempts; i++) {
+        const total = await fetchServerTotal();
+        if (total !== null) return total;
+        await new Promise((r) => setTimeout(r, 300));
+      }
+      return null;
     }
 
     function show(id) {
@@ -309,9 +305,7 @@
         history.replaceState({}, "", u.pathname);
       } catch (_) {}
 
-      const cachedBefore = getCachedPoints();
-      console.log("[scan] cached balance before =", cachedBefore);
-
+      // === 1. Redeem on the server ===
       const { data, error } = await sb.rpc("redeem_qr_token", {
         p_token: token,
         p_device_id: getDeviceId(),
@@ -328,25 +322,36 @@
       console.log("[scan] RPC result:", data);
 
       if (data.ok) {
+        // === 2. Server has now inserted the row. Fetch authoritative total. ===
         const awarded = Number(data.points) || 100;
-        const newBalance = cachedBefore + awarded;
+        const serverTotal = await fetchServerTotalWithRetry();
 
-        setCachedPoints(newBalance);
-        $("successBalance").textContent = newBalance.toLocaleString();
+        let displayBalance;
+        if (serverTotal !== null) {
+          // Trust the server completely
+          displayBalance = serverTotal;
+          console.log("[scan] server total after redeem =", serverTotal);
+        } else {
+          // Offline fallback only
+          const cached = parseInt(localStorage.getItem(POINTS_KEY) || "0", 10) || 0;
+          displayBalance = cached + awarded;
+          console.warn("[scan] server unreachable, using cache fallback =", displayBalance);
+        }
+
+        localStorage.setItem(POINTS_KEY, String(displayBalance));
+        $("successBalance").textContent = displayBalance.toLocaleString();
         show("stateSuccess");
 
-        fetchBalance().then((serverTotal) => {
-          if (serverTotal === null) return;
-          if (serverTotal >= newBalance) {
-            setCachedPoints(serverTotal);
-            $("successBalance").textContent = serverTotal.toLocaleString();
-          }
-        });
       } else if (data.reason === "used") {
-        let balance = await fetchBalance();
-        if (balance === null) balance = cachedBefore;
-        $("usedBalance").textContent = balance.toLocaleString();
+        // Used QR — best-effort balance display
+        const serverTotal = await fetchServerTotalWithRetry(2);
+        let displayBalance = serverTotal;
+        if (displayBalance === null) {
+          displayBalance = parseInt(localStorage.getItem(POINTS_KEY) || "0", 10) || 0;
+        }
+        $("usedBalance").textContent = displayBalance.toLocaleString();
         show("stateUsed");
+
       } else {
         show("stateInvalid");
       }
@@ -354,9 +359,12 @@
       $("shopSection").classList.remove("hidden");
     })();
 
+    // === SHOP ===
     async function attemptPurchase(name, price) {
-      let balance = await fetchBalance();
-      if (balance === null) balance = getCachedPoints();
+      let balance = await fetchServerTotal();
+      if (balance === null) {
+        balance = parseInt(localStorage.getItem(POINTS_KEY) || "0", 10) || 0;
+      }
 
       console.log("[shop] balance =", balance, "price =", price);
 
