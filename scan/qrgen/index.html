@@ -35,7 +35,6 @@
     }
     body { display: flex; flex-direction: column; min-height: 100vh; }
 
-    /* Topbar */
     .topbar {
       display: flex;
       align-items: center;
@@ -54,7 +53,6 @@
     }
     .brand-fallback::before { content: ""; width: 10px; height: 10px; background: var(--green-500); }
 
-    /* Page */
     .page {
       flex: 1;
       width: 100%;
@@ -66,7 +64,6 @@
       gap: 32px;
     }
 
-    /* Hero */
     .hero { display: flex; flex-direction: column; gap: 12px; }
     .label {
       font-size: 0.68rem;
@@ -88,7 +85,6 @@
       line-height: 1.6;
     }
 
-    /* Warning banner */
     .warn {
       display: flex;
       gap: 14px;
@@ -116,16 +112,7 @@
       line-height: 1.55;
     }
     .warn-text strong { color: var(--amber); font-weight: 700; }
-    .warn-text code {
-      background: var(--white);
-      padding: 1px 6px;
-      font-family: ui-monospace, 'SF Mono', Menlo, monospace;
-      font-size: 0.82em;
-      border: 1px solid #e8d9a3;
-      color: var(--ink);
-    }
 
-    /* Controls */
     .controls {
       display: flex;
       gap: 10px;
@@ -171,7 +158,6 @@
     .status.success { color: var(--green-700); font-weight: 700; }
     .status.error { color: #b23b3b; font-weight: 700; }
 
-    /* QR Grid */
     .qr-grid {
       display: grid;
       grid-template-columns: repeat(5, 1fr);
@@ -190,7 +176,8 @@
     }
     .qr-card:hover { border-color: var(--green-500); }
 
-    .qr-card canvas {
+    .qr-card canvas,
+    .qr-card img {
       width: 100%;
       height: auto;
       display: block;
@@ -234,7 +221,6 @@
     .qr-card:hover .qr-dl { opacity: 1; }
     .qr-dl:hover { background: var(--green-700); color: var(--white); border-color: var(--green-700); }
 
-    /* Footer */
     .foot {
       border-top: 1px solid var(--line);
       background: var(--white);
@@ -248,7 +234,6 @@
       color: var(--muted);
     }
 
-    /* Mobile */
     @media (max-width: 900px) {
       .qr-grid { grid-template-columns: repeat(3, 1fr); gap: 12px; }
     }
@@ -262,7 +247,6 @@
       .status { margin-left: 0; width: 100%; order: 3; }
     }
 
-    /* ---------- PRINT SHEET ---------- */
     @media print {
       @page { size: A4 portrait; margin: 8mm; }
       html, body { background: #fff; }
@@ -281,7 +265,7 @@
         box-shadow: none;
         gap: 1mm !important;
       }
-      .qr-card canvas { width: 100% !important; height: auto !important; }
+      .qr-card canvas, .qr-card img { width: 100% !important; height: auto !important; }
       .qr-num { font-size: 6pt !important; letter-spacing: 0.1em !important; }
       .qr-token { font-size: 5.5pt !important; color: #333 !important; }
       .qr-card:hover { border-color: #999 !important; }
@@ -309,7 +293,7 @@
     <div class="warn">
       <div class="warn-icon">!</div>
       <div class="warn-text">
-        <strong>Before printing:</strong> run <code>select reset_greenbank_qr();</code> in Supabase to make sure all 30 tokens are fresh. Also, <strong>do not share this page's URL</strong> — anyone who opens it can download and print the QRs.
+        <strong>Before printing:</strong> run the reset command in Supabase to make sure all 30 tokens are fresh. Also, <strong>do not share this page's URL</strong> — anyone who opens it can download and print the QRs.
       </div>
     </div>
 
@@ -343,7 +327,7 @@
     <span>GREEN BANK · INTERNAL QR GENERATOR · DO NOT SHARE</span>
   </footer>
 
-  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
   <script>
     // ====== DATA ======
@@ -356,8 +340,8 @@
       'b3a9c64e','72e5f80d','c4b1e97a','0e6d3b95','d7f2a84c'
     ];
     const BASE_URL = "https://mygreenbank.vercel.app/scan/?qr=";
-    const PREVIEW_SIZE = 512;   // on-screen canvas
-    const DOWNLOAD_SIZE = 1024; // PNG for print
+    const PREVIEW_SIZE = 512;
+    const DOWNLOAD_SIZE = 1024;
 
     const $ = (id) => document.getElementById(id);
 
@@ -372,14 +356,82 @@
       return `qr-${String(index + 1).padStart(2, "0")}-${token}.png`;
     }
 
+    // ====== CORE QR RENDER (qrcodejs → canvas) ======
+    function renderQR(url, size) {
+      return new Promise((resolve) => {
+        const wrapper = document.createElement("div");
+        wrapper.style.cssText = "position:fixed;left:-99999px;top:-99999px;width:1px;height:1px;overflow:hidden;";
+        document.body.appendChild(wrapper);
+
+        try {
+          new QRCode(wrapper, {
+            text: url,
+            width: size,
+            height: size,
+            colorDark: "#000000",
+            colorLight: "#ffffff",
+            correctLevel: QRCode.CorrectLevel.H
+          });
+        } catch (e) {
+          console.error("[qr] render threw", e);
+          wrapper.remove();
+          resolve(null);
+          return;
+        }
+
+        // qrcodejs is synchronous in most browsers, but wait a bit to be safe
+        let attempts = 40; // 40 × 50ms = 2s max
+        const tryExtract = () => {
+          const canvas = wrapper.querySelector("canvas");
+          const img = wrapper.querySelector("img");
+
+          let source = null;
+          if (canvas && canvas.width > 0) {
+            source = canvas;
+          } else if (img && img.complete && img.naturalWidth > 0) {
+            source = img;
+          }
+
+          if (!source) {
+            attempts--;
+            if (attempts <= 0) {
+              wrapper.remove();
+              resolve(null);
+              return;
+            }
+            setTimeout(tryExtract, 50);
+            return;
+          }
+
+          try {
+            const out = document.createElement("canvas");
+            out.width = size;
+            out.height = size;
+            const ctx = out.getContext("2d");
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(0, 0, size, size);
+            ctx.drawImage(source, 0, 0, size, size);
+            wrapper.remove();
+            resolve(out);
+          } catch (e) {
+            console.error("[qr] extract threw", e);
+            wrapper.remove();
+            resolve(null);
+          }
+        };
+
+        setTimeout(tryExtract, 0);
+      });
+    }
+
     // ====== GENERATE ALL PREVIEWS ======
     async function generateAll() {
       if (typeof QRCode === "undefined") {
-        setStatus("QR library failed to load. Check your connection.", "error");
+        setStatus("QR library failed to load. Check your connection and reload.", "error");
         return;
       }
       if (typeof JSZip === "undefined") {
-        setStatus("ZIP library failed to load. Check your connection.", "error");
+        setStatus("ZIP library failed to load. Check your connection and reload.", "error");
         return;
       }
 
@@ -394,7 +446,7 @@
         const card = document.createElement("div");
         card.className = "qr-card";
         card.innerHTML = `
-          <canvas width="${PREVIEW_SIZE}" height="${PREVIEW_SIZE}"></canvas>
+          <div class="qr-visual"></div>
           <div class="qr-info">
             <div class="qr-num">QR ${num}</div>
             <div class="qr-token">${token}</div>
@@ -409,16 +461,16 @@
         `;
         grid.appendChild(card);
 
-        const canvas = card.querySelector("canvas");
-        await QRCode.toCanvas(canvas, url, {
-          width: PREVIEW_SIZE,
-          margin: 2,
-          errorCorrectionLevel: "M",
-          color: { dark: "#000000", light: "#ffffff" }
-        });
+        const visual = card.querySelector(".qr-visual");
+        const canvas = await renderQR(url, PREVIEW_SIZE);
+
+        if (canvas) {
+          visual.appendChild(canvas);
+        } else {
+          visual.innerHTML = `<div style="aspect-ratio:1/1;background:#f0f0f0;display:flex;align-items:center;justify-content:center;font-size:0.7rem;color:#999;">QR failed</div>`;
+        }
 
         setStatus(`Generated ${i + 1} / ${TOKENS.length}…`);
-        // tiny yield to keep UI responsive
         await new Promise((r) => setTimeout(r, 0));
       }
 
@@ -430,20 +482,19 @@
     // ====== INDIVIDUAL DOWNLOAD ======
     async function downloadOne(index) {
       const token = TOKENS[index];
-      const canvas = document.createElement("canvas");
-      await QRCode.toCanvas(canvas, makeUrl(token), {
-        width: DOWNLOAD_SIZE,
-        margin: 2,
-        errorCorrectionLevel: "M",
-        color: { dark: "#000000", light: "#ffffff" }
-      });
-
+      setStatus(`Preparing QR ${index + 1}…`);
+      const canvas = await renderQR(makeUrl(token), DOWNLOAD_SIZE);
+      if (!canvas) {
+        setStatus("Failed to generate QR. Try again.", "error");
+        return;
+      }
       const a = document.createElement("a");
       a.download = makeFilename(index, token);
       a.href = canvas.toDataURL("image/png");
       document.body.appendChild(a);
       a.click();
-      document.body.removeChild(a);
+      a.remove();
+      setStatus(`Downloaded QR ${index + 1}.`, "success");
     }
 
     // ====== DOWNLOAD ALL AS ZIP ======
@@ -458,18 +509,14 @@
 
         for (let i = 0; i < TOKENS.length; i++) {
           const token = TOKENS[i];
-          const canvas = document.createElement("canvas");
-          await QRCode.toCanvas(canvas, makeUrl(token), {
-            width: DOWNLOAD_SIZE,
-            margin: 2,
-            errorCorrectionLevel: "M",
-            color: { dark: "#000000", light: "#ffffff" }
-          });
-
-          const dataUrl = canvas.toDataURL("image/png");
-          const base64 = dataUrl.split(",")[1];
+          const canvas = await renderQR(makeUrl(token), DOWNLOAD_SIZE);
+          if (!canvas) {
+            setStatus(`QR ${i + 1} failed. Aborting ZIP.`, "error");
+            btn.disabled = false;
+            return;
+          }
+          const base64 = canvas.toDataURL("image/png").split(",")[1];
           folder.file(makeFilename(i, token), base64, { base64: true });
-
           setStatus(`Adding ${i + 1} / ${TOKENS.length} to ZIP…`);
           await new Promise((r) => setTimeout(r, 0));
         }
@@ -483,7 +530,7 @@
         a.href = url;
         document.body.appendChild(a);
         a.click();
-        document.body.removeChild(a);
+        a.remove();
         setTimeout(() => URL.revokeObjectURL(url), 2000);
 
         setStatus(`ZIP downloaded (${TOKENS.length} PNGs).`, "success");
@@ -501,7 +548,10 @@
     }
 
     // ====== BOOT ======
-    window.addEventListener("load", generateAll);
+    window.addEventListener("load", () => {
+      // small delay to make sure qrcodejs is fully ready
+      setTimeout(generateAll, 100);
+    });
   </script>
 </body>
 </html>
