@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>QR Generator · Green Bank</title>
+  <meta name="robots" content="noindex, nofollow" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --green-900: #0f3d2e;
+      --green-700: #176b4d;
+      --green-500: #22a06b;
+      --green-300: #6ed6a2;
+      --green-100: #e6f6ee;
+      --ink: #0b0f0d;
+      --muted: #6b7770;
+      --line: #d9e0db;
+      --bg: #f4f7f5;
+      --white: #ffffff;
+      --amber: #8a6d00;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    html, body {
+      min-height: 100%;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      font-size: 16px;
+      line-height: 1.5;
+    }
+    body { display: flex; flex-direction: column; min-height: 100vh; }
+
+    /* Topbar */
+    .topbar {
+      display: flex;
+      align-items: center;
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--line);
+      background: var(--white);
+    }
+    .brand-logo { height: 32px; width: auto; display: block; }
+    .brand-fallback {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.22em;
+    }
+    .brand-fallback::before { content: ""; width: 10px; height: 10px; background: var(--green-500); }
+
+    /* Page */
+    .page {
+      flex: 1;
+      width: 100%;
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 40px 24px 72px;
+      display: flex;
+      flex-direction: column;
+      gap: 32px;
+    }
+
+    /* Hero */
+    .hero { display: flex; flex-direction: column; gap: 12px; }
+    .label {
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.24em;
+      color: var(--green-700);
+    }
+    .hero h1 {
+      font-size: 2rem;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+      color: var(--ink);
+    }
+    .hero .sub {
+      font-size: 0.95rem;
+      color: var(--muted);
+      max-width: 620px;
+      line-height: 1.6;
+    }
+
+    /* Warning banner */
+    .warn {
+      display: flex;
+      gap: 14px;
+      background: #fdf6e3;
+      border: 1px solid #e8d9a3;
+      border-left: 3px solid var(--amber);
+      padding: 14px 18px;
+      align-items: flex-start;
+    }
+    .warn-icon {
+      flex-shrink: 0;
+      width: 22px; height: 22px;
+      border-radius: 50%;
+      background: var(--amber);
+      color: #fff;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 0.8rem;
+    }
+    .warn-text {
+      font-size: 0.85rem;
+      color: var(--ink);
+      line-height: 1.55;
+    }
+    .warn-text strong { color: var(--amber); font-weight: 700; }
+    .warn-text code {
+      background: var(--white);
+      padding: 1px 6px;
+      font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+      font-size: 0.82em;
+      border: 1px solid #e8d9a3;
+      color: var(--ink);
+    }
+
+    /* Controls */
+    .controls {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+      padding: 20px 0;
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+    }
+    .btn {
+      border: none;
+      cursor: pointer;
+      font-family: inherit;
+      font-weight: 700;
+      font-size: 0.85rem;
+      letter-spacing: 0.02em;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 12px 20px;
+      min-height: 44px;
+      text-decoration: none;
+      transition: background 0.15s ease, opacity 0.15s ease;
+      background: var(--green-700);
+      color: var(--white);
+    }
+    .btn:hover { background: var(--green-900); }
+    .btn:disabled { opacity: 0.55; cursor: not-allowed; }
+    .btn.secondary {
+      background: transparent;
+      color: var(--green-700);
+      border: 1px solid var(--green-500);
+    }
+    .btn.secondary:hover { background: var(--green-100); }
+
+    .status {
+      margin-left: auto;
+      font-size: 0.82rem;
+      color: var(--muted);
+      font-weight: 500;
+    }
+    .status.success { color: var(--green-700); font-weight: 700; }
+    .status.error { color: #b23b3b; font-weight: 700; }
+
+    /* QR Grid */
+    .qr-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 16px;
+    }
+
+    .qr-card {
+      background: var(--white);
+      border: 1px solid var(--line);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      position: relative;
+      transition: border-color 0.15s ease;
+    }
+    .qr-card:hover { border-color: var(--green-500); }
+
+    .qr-card canvas {
+      width: 100%;
+      height: auto;
+      display: block;
+      background: var(--white);
+    }
+
+    .qr-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .qr-num {
+      font-size: 0.65rem;
+      font-weight: 800;
+      letter-spacing: 0.2em;
+      color: var(--green-700);
+    }
+    .qr-token {
+      font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+      font-size: 0.72rem;
+      color: var(--muted);
+      word-break: break-all;
+    }
+
+    .qr-dl {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      width: 30px;
+      height: 30px;
+      border: 1px solid var(--line);
+      background: var(--white);
+      color: var(--muted);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+      opacity: 0;
+    }
+    .qr-card:hover .qr-dl { opacity: 1; }
+    .qr-dl:hover { background: var(--green-700); color: var(--white); border-color: var(--green-700); }
+
+    /* Footer */
+    .foot {
+      border-top: 1px solid var(--line);
+      background: var(--white);
+      padding: 16px 24px;
+      text-align: center;
+    }
+    .foot span {
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.22em;
+      color: var(--muted);
+    }
+
+    /* Mobile */
+    @media (max-width: 900px) {
+      .qr-grid { grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    }
+    @media (max-width: 600px) {
+      .page { padding: 24px 16px 56px; gap: 24px; }
+      .hero h1 { font-size: 1.5rem; }
+      .qr-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+      .qr-card { padding: 10px; }
+      .qr-dl { opacity: 1; }
+      .controls { padding: 16px 0; }
+      .status { margin-left: 0; width: 100%; order: 3; }
+    }
+
+    /* ---------- PRINT SHEET ---------- */
+    @media print {
+      @page { size: A4 portrait; margin: 8mm; }
+      html, body { background: #fff; }
+      .topbar, .hero, .controls, .warn, .foot, .qr-dl { display: none !important; }
+      .page { padding: 0; max-width: none; gap: 0; }
+      .qr-grid {
+        grid-template-columns: repeat(5, 1fr) !important;
+        gap: 3mm;
+        width: 100%;
+      }
+      .qr-card {
+        border: 1px dashed #999 !important;
+        padding: 2mm !important;
+        break-inside: avoid;
+        page-break-inside: avoid;
+        box-shadow: none;
+        gap: 1mm !important;
+      }
+      .qr-card canvas { width: 100% !important; height: auto !important; }
+      .qr-num { font-size: 6pt !important; letter-spacing: 0.1em !important; }
+      .qr-token { font-size: 5.5pt !important; color: #333 !important; }
+      .qr-card:hover { border-color: #999 !important; }
+    }
+  </style>
+</head>
+<body>
+
+  <header class="topbar">
+    <img src="/da.png" alt="Green Bank" class="brand-logo"
+         onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" />
+    <div class="brand-fallback">GREEN BANK</div>
+  </header>
+
+  <main class="page">
+
+    <section class="hero">
+      <div class="label">ADMIN · QR GENERATOR</div>
+      <h1>30 QR Codes for Printing</h1>
+      <p class="sub">
+        Each QR links to <strong>mygreenbank.vercel.app/scan/?qr=&lt;token&gt;</strong> and awards +100 points to the first person who scans it. Download all 30 as a ZIP, or print directly to PDF.
+      </p>
+    </section>
+
+    <div class="warn">
+      <div class="warn-icon">!</div>
+      <div class="warn-text">
+        <strong>Before printing:</strong> run <code>select reset_greenbank_qr();</code> in Supabase to make sure all 30 tokens are fresh. Also, <strong>do not share this page's URL</strong> — anyone who opens it can download and print the QRs.
+      </div>
+    </div>
+
+    <div class="controls">
+      <button class="btn" id="downloadAllBtn" onclick="downloadAllZip()" disabled>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="7 10 12 15 17 10"/>
+          <line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        Download All (ZIP)
+      </button>
+
+      <button class="btn secondary" onclick="printSheet()" disabled id="printBtn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="6 9 6 2 18 2 18 9"/>
+          <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
+          <rect x="6" y="14" width="12" height="8"/>
+        </svg>
+        Print Sheet
+      </button>
+
+      <div class="status" id="status">Loading QR library…</div>
+    </div>
+
+    <div class="qr-grid" id="qrGrid"></div>
+
+  </main>
+
+  <footer class="foot">
+    <span>GREEN BANK · INTERNAL QR GENERATOR · DO NOT SHARE</span>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script>
+    // ====== DATA ======
+    const TOKENS = [
+      'a3f9c12e','7b2d6a48','e54f8b21','c9a3d570','2f81e6c4',
+      '9d4b0f37','6a7c2e91','b1e8d45a','48c9f3b2','e7a20d6f',
+      '3d6b8f14','f2c8a9e5','85e1b7c3','0a4f9d28','c6e3f10b',
+      '19d5a72e','b4e9c83f','67a1f2d9','d8b4e015','2e7c9a53',
+      'f9a6d14b','4c3e8b27','a8d2f56e','e1b7c4a9','5f8e2d31',
+      'b3a9c64e','72e5f80d','c4b1e97a','0e6d3b95','d7f2a84c'
+    ];
+    const BASE_URL = "https://mygreenbank.vercel.app/scan/?qr=";
+    const PREVIEW_SIZE = 512;   // on-screen canvas
+    const DOWNLOAD_SIZE = 1024; // PNG for print
+
+    const $ = (id) => document.getElementById(id);
+
+    function setStatus(text, kind) {
+      const el = $("status");
+      el.textContent = text;
+      el.className = "status" + (kind ? " " + kind : "");
+    }
+
+    function makeUrl(token) { return BASE_URL + token; }
+    function makeFilename(index, token) {
+      return `qr-${String(index + 1).padStart(2, "0")}-${token}.png`;
+    }
+
+    // ====== GENERATE ALL PREVIEWS ======
+    async function generateAll() {
+      if (typeof QRCode === "undefined") {
+        setStatus("QR library failed to load. Check your connection.", "error");
+        return;
+      }
+      if (typeof JSZip === "undefined") {
+        setStatus("ZIP library failed to load. Check your connection.", "error");
+        return;
+      }
+
+      const grid = $("qrGrid");
+      grid.innerHTML = "";
+
+      for (let i = 0; i < TOKENS.length; i++) {
+        const token = TOKENS[i];
+        const url = makeUrl(token);
+        const num = String(i + 1).padStart(2, "0");
+
+        const card = document.createElement("div");
+        card.className = "qr-card";
+        card.innerHTML = `
+          <canvas width="${PREVIEW_SIZE}" height="${PREVIEW_SIZE}"></canvas>
+          <div class="qr-info">
+            <div class="qr-num">QR ${num}</div>
+            <div class="qr-token">${token}</div>
+          </div>
+          <button class="qr-dl" onclick="downloadOne(${i})" aria-label="Download QR ${num}">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/>
+              <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+          </button>
+        `;
+        grid.appendChild(card);
+
+        const canvas = card.querySelector("canvas");
+        await QRCode.toCanvas(canvas, url, {
+          width: PREVIEW_SIZE,
+          margin: 2,
+          errorCorrectionLevel: "M",
+          color: { dark: "#000000", light: "#ffffff" }
+        });
+
+        setStatus(`Generated ${i + 1} / ${TOKENS.length}…`);
+        // tiny yield to keep UI responsive
+        await new Promise((r) => setTimeout(r, 0));
+      }
+
+      $("downloadAllBtn").disabled = false;
+      $("printBtn").disabled = false;
+      setStatus(`All ${TOKENS.length} QR codes ready.`, "success");
+    }
+
+    // ====== INDIVIDUAL DOWNLOAD ======
+    async function downloadOne(index) {
+      const token = TOKENS[index];
+      const canvas = document.createElement("canvas");
+      await QRCode.toCanvas(canvas, makeUrl(token), {
+        width: DOWNLOAD_SIZE,
+        margin: 2,
+        errorCorrectionLevel: "M",
+        color: { dark: "#000000", light: "#ffffff" }
+      });
+
+      const a = document.createElement("a");
+      a.download = makeFilename(index, token);
+      a.href = canvas.toDataURL("image/png");
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+
+    // ====== DOWNLOAD ALL AS ZIP ======
+    async function downloadAllZip() {
+      const btn = $("downloadAllBtn");
+      btn.disabled = true;
+      setStatus("Building ZIP…");
+
+      try {
+        const zip = new JSZip();
+        const folder = zip.folder("greenbank-qrs");
+
+        for (let i = 0; i < TOKENS.length; i++) {
+          const token = TOKENS[i];
+          const canvas = document.createElement("canvas");
+          await QRCode.toCanvas(canvas, makeUrl(token), {
+            width: DOWNLOAD_SIZE,
+            margin: 2,
+            errorCorrectionLevel: "M",
+            color: { dark: "#000000", light: "#ffffff" }
+          });
+
+          const dataUrl = canvas.toDataURL("image/png");
+          const base64 = dataUrl.split(",")[1];
+          folder.file(makeFilename(i, token), base64, { base64: true });
+
+          setStatus(`Adding ${i + 1} / ${TOKENS.length} to ZIP…`);
+          await new Promise((r) => setTimeout(r, 0));
+        }
+
+        setStatus("Compressing…");
+        const blob = await zip.generateAsync({ type: "blob" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        const date = new Date().toISOString().slice(0, 10);
+        a.download = `greenbank-qrs-${date}.zip`;
+        a.href = url;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 2000);
+
+        setStatus(`ZIP downloaded (${TOKENS.length} PNGs).`, "success");
+      } catch (err) {
+        console.error(err);
+        setStatus("ZIP failed. Try again or download individually.", "error");
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    // ====== PRINT ======
+    function printSheet() {
+      window.print();
+    }
+
+    // ====== BOOT ======
+    window.addEventListener("load", generateAll);
+  </script>
+</body>
+</html>
