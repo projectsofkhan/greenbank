@@ -33,11 +33,10 @@
     }
     body { display: flex; flex-direction: column; min-height: 100vh; }
 
-    /* Topbar */
+    /* Topbar — logo only, no member chip */
     .topbar {
       display: flex;
       align-items: center;
-      justify-content: space-between;
       padding: 16px 24px;
       border-bottom: 1px solid var(--line);
       background: var(--white);
@@ -55,27 +54,6 @@
       content: "";
       width: 10px; height: 10px;
       background: var(--green-500);
-    }
-    .member-chip {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 8px 14px;
-      border: 1px solid var(--line);
-      background: var(--white);
-    }
-    .member-label {
-      font-size: 0.62rem;
-      font-weight: 700;
-      letter-spacing: 0.2em;
-      color: var(--muted);
-    }
-    .member-name {
-      font-size: 0.78rem;
-      font-weight: 700;
-      letter-spacing: 0.08em;
-      color: var(--ink);
-      text-transform: uppercase;
     }
 
     /* Page */
@@ -117,10 +95,10 @@
       line-height: 1.6;
     }
 
-    /* Stats strip */
+    /* Stats strip — balance + scans only, no rank */
     .stats {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
+      grid-template-columns: repeat(2, 1fr);
       background: var(--white);
       border: 1px solid var(--line);
     }
@@ -468,11 +446,6 @@
     <img src="/da.png" alt="Green Bank" class="brand-logo"
          onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" />
     <div class="brand-fallback">GREEN BANK</div>
-
-    <div class="member-chip">
-      <span class="member-label">MEMBER</span>
-      <span class="member-name" id="memberName">GUEST</span>
-    </div>
   </header>
 
   <main class="page">
@@ -494,10 +467,6 @@
       <div class="stat">
         <div class="stat-label">TOTAL SCANS</div>
         <div class="stat-value" id="scansValue">—</div>
-      </div>
-      <div class="stat">
-        <div class="stat-label">RANK</div>
-        <div class="stat-value" id="rankValue">—</div>
       </div>
     </section>
 
@@ -700,31 +669,26 @@
       } catch (e) { return null; }
     }
 
-    async function fetchStats() {
-      const deviceId = getDeviceId();
-      const identity = getIdentity();
-      const [subsRes, lbRes] = await Promise.all([
-        sb.from("submissions").select("points").eq("device_id", deviceId),
-        sb.from("leaderboard").select("identity, total_points").order("total_points", { ascending: false }),
-      ]);
-      const total = (subsRes.data || []).reduce((s, r) => s + (r.points || 0), 0);
-      const scans = (subsRes.data || []).length;
-      let rank = "—";
-      if (lbRes.data) {
-        const idx = lbRes.data.findIndex((r) => r.identity === identity);
-        if (idx >= 0) rank = "#" + (idx + 1);
+    async function fetchTotals() {
+      try {
+        const { data, error } = await sb
+          .from("submissions").select("points")
+          .eq("device_id", getDeviceId());
+        if (error) return { total: 0, scans: 0 };
+        return {
+          total: (data || []).reduce((s, r) => s + (r.points || 0), 0),
+          scans: (data || []).length,
+        };
+      } catch (e) {
+        return { total: 0, scans: 0 };
       }
-      return { total, scans, rank };
     }
 
     (async function boot() {
-      $("memberName").textContent = (getName() || "GUEST").toUpperCase();
-
-      const stats = await fetchStats();
-      $("balanceValue").textContent = stats.total.toLocaleString();
-      $("scansValue").textContent = stats.scans;
-      $("rankValue").textContent = stats.rank;
-      localStorage.setItem(POINTS_KEY, String(stats.total));
+      const totals = await fetchTotals();
+      $("balanceValue").textContent = totals.total.toLocaleString();
+      $("scansValue").textContent = totals.scans;
+      localStorage.setItem(POINTS_KEY, String(totals.total));
     })();
 
     async function attemptPurchase(name, price) {
