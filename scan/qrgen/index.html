@@ -330,7 +330,6 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
   <script>
-    // ====== DATA ======
     const TOKENS = [
       'a3f9c12e','7b2d6a48','e54f8b21','c9a3d570','2f81e6c4',
       '9d4b0f37','6a7c2e91','b1e8d45a','48c9f3b2','e7a20d6f',
@@ -370,7 +369,7 @@
             height: size,
             colorDark: "#000000",
             colorLight: "#ffffff",
-            correctLevel: QRCode.CorrectLevel.H
+            correctLevel: QRCode.CorrectLevel.M // Changed from H to M for lower density
           });
         } catch (e) {
           console.error("[qr] render threw", e);
@@ -379,8 +378,7 @@
           return;
         }
 
-        // qrcodejs is synchronous in most browsers, but wait a bit to be safe
-        let attempts = 40; // 40 × 50ms = 2s max
+        let attempts = 40;
         const tryExtract = () => {
           const canvas = wrapper.querySelector("canvas");
           const img = wrapper.querySelector("img");
@@ -408,9 +406,24 @@
             out.width = size;
             out.height = size;
             const ctx = out.getContext("2d");
+            
+            // 1. Fill entire background with white (Quiet Zone)
             ctx.fillStyle = "#ffffff";
             ctx.fillRect(0, 0, size, size);
-            ctx.drawImage(source, 0, 0, size, size);
+            
+            // 2. Calculate margin (10% of total size)
+            const margin = Math.floor(size * 0.1);
+            const qrSize = size - (margin * 2);
+            
+            // 3. Disable blurring so pixels stay sharp
+            ctx.imageSmoothingEnabled = false;
+            ctx.mozImageSmoothingEnabled = false;
+            ctx.webkitImageSmoothingEnabled = false;
+            ctx.msImageSmoothingEnabled = false;
+            
+            // 4. Draw the QR code centered inside the white margin
+            ctx.drawImage(source, margin, margin, qrSize, qrSize);
+
             wrapper.remove();
             resolve(out);
           } catch (e) {
@@ -549,7 +562,6 @@
 
     // ====== BOOT ======
     window.addEventListener("load", () => {
-      // small delay to make sure qrcodejs is fully ready
       setTimeout(generateAll, 100);
     });
   </script>
