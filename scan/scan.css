@@ -1,15 +1,15 @@
 :root {
-  --green-900: #0f3d2e;
-  --green-700: #176b4d;
-  --green-500: #22a06b;
-  --green-300: #6ed6a2;
-  --green-100: #e6f6ee;
-  --ink: #0b0f0d;
-  --muted: #6b7770;
-  --line: #d9e0db;
-  --bg: #f4f7f5;
+  --green-900: #1D2D35;
+  --green-700: #164534;
+  --green-500: #1E5A44;
+  --green-300: #F58220;
+  --green-100: #E8F2ED;
+  --ink: #1D2D35;
+  --muted: #4A4A4A;
+  --line: #D6D6D6;
+  --bg: #EBEBEB;
   --white: #ffffff;
-  --red: #b23b3b;
+  --red: #C1272D;
   --amber: #8a6d00;
 }
 
@@ -27,7 +27,6 @@ html, body {
 
 body { display: flex; flex-direction: column; min-height: 100vh; }
 
-/* ---------- Mark ---------- */
 .mark {
   display: flex;
   align-items: center;
@@ -53,7 +52,6 @@ body { display: flex; flex-direction: column; min-height: 100vh; }
   display: inline-block;
 }
 
-/* ---------- Layout ---------- */
 .wrap {
   flex: 1;
   width: 100%;
@@ -65,7 +63,6 @@ body { display: flex; flex-direction: column; min-height: 100vh; }
   gap: 24px;
 }
 
-/* ---------- State blocks ---------- */
 .state {
   background: var(--white);
   border: 1px solid var(--line);
@@ -130,7 +127,6 @@ body { display: flex; flex-direction: column; min-height: 100vh; }
   font-variant-numeric: tabular-nums;
 }
 
-/* ---------- Detail list ---------- */
 .detail-list {
   width: 100%;
   border-top: 1px solid var(--line);
@@ -160,7 +156,6 @@ body { display: flex; flex-direction: column; min-height: 100vh; }
 }
 .detail-val strong { color: var(--green-700); font-weight: 600; }
 
-/* ---------- Loader ---------- */
 .loader {
   width: 100%;
   height: 3px;
@@ -182,7 +177,6 @@ body { display: flex; flex-direction: column; min-height: 100vh; }
   100% { transform: translateX(300%); }
 }
 
-/* ---------- Shop ---------- */
 .shop { display: flex; flex-direction: column; gap: 20px; }
 .shop.hidden { display: none; }
 
@@ -248,11 +242,7 @@ body { display: flex; flex-direction: column; min-height: 100vh; }
   flex: 1;
 }
 
-.card-name {
-  font-size: 0.92rem;
-  font-weight: 600;
-  color: var(--ink);
-}
+.card-name { font-size: 0.92rem; font-weight: 600; color: var(--ink); }
 .card-desc {
   font-size: 0.75rem;
   color: var(--muted);
@@ -305,12 +295,8 @@ body { display: flex; flex-direction: column; min-height: 100vh; }
   color: var(--muted);
   flex-shrink: 0;
 }
-.btn.ghost:hover {
-  border-color: var(--green-500);
-  color: var(--green-700);
-}
+.btn.ghost:hover { border-color: var(--green-500); color: var(--green-700); }
 
-/* ---------- Footer ---------- */
 .foot {
   border-top: 1px solid var(--line);
   background: var(--white);
@@ -330,11 +316,10 @@ body { display: flex; flex-direction: column; min-height: 100vh; }
 }
 .foot a:hover { color: var(--green-900); }
 
-/* ---------- Modal ---------- */
 .modal-back {
   position: fixed;
   inset: 0;
-  background: rgba(11, 15, 13, 0.55);
+  background: rgba(29, 45, 53, 0.55);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -408,7 +393,6 @@ body { display: flex; flex-direction: column; min-height: 100vh; }
 
 .hidden { display: none !important; }
 
-/* ---------- Scan home CTA ---------- */
 .home-cta {
   display: flex;
   flex-direction: column;
@@ -446,7 +430,6 @@ body { display: flex; flex-direction: column; min-height: 100vh; }
 }
 .home-cta-btn:hover { background: var(--green-900); }
 
-/* ---------- Mobile ---------- */
 @media (max-width: 720px) {
   .wrap { padding: 20px 16px 48px; gap: 20px; }
   .state { padding: 28px 20px; gap: 12px; }
